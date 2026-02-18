@@ -1457,3 +1457,262 @@ run(1, 600)
 
 
 
+
+
+#----Build Wald's Z recombinant-microbe heatmap (WIP):----
+
+
+
+ST_threshold <- 0.3
+
+num_sts <- #number of supertypes (clusters)
+  
+  #d is DAPC result
+  #d$posterior
+  #supertypes <- apply(d$posterior, 1, function(probs){ names(probs[probs >= ST_threshold])} )
+  #for each individual, gets which supertypes (of my analysis) it has at least a 30% match with 
+  
+  #use it to find the supertypes of the 21 given disease net seahorses by searching by their names
+  #get the order in which the name appears on the list, then grab that position in d$posterior's details 
+  
+  diseased_names <- read.csv("GLMOTUSTv2.csv")$FISH
+
+diseased_supertypes <- data.frame()
+
+for(n in diseased_names){
+  
+  sts_by_name <- setNames(rep(0, num_sts), paste0("ST", 1:num_sts))
+  
+  sts_for_this_fish <- c(supertypes[[n]])
+  
+  for(s in sts_for_this_fish){
+    
+    sts_by_name$s <- 1
+    
+  }
+  
+  diseased_supertypes <- rbind(diseased_supertypes, FISH = n, sts_by_name)
+  
+}
+
+#insert this as ST section in GLMOTUSTv2 as dataframe
+#just paste it into the excel sheet
+
+
+
+
+#glm of microbe (M0001, M0002, etc) abundance (and variance? etc) versus supertypes (borrowed from script)
+#get Wald's Z from glm for each glm comparison, store it in table (borrowed from script)
+
+calculate_data <- function(f){
+  
+  H <- read.csv(file = f, header = TRUE)
+  
+  #Count number of Microbe columns (^M)
+  NMicrobes<-length(grep(x = colnames(H), pattern = "^M"))
+  
+  #Count number of Supertype columns (^S)
+  NSupertypes<-length(grep(x = colnames(H), pattern = "^S"))
+  
+  #Total OTUS per fish - 8158 [Data are rarified to 8158] (DATA HAS BEEN RAREFIED)
+  
+  FishOTUS<-apply(H[2:NMicrobes], 1,sum)
+  
+  
+  
+  #Extract microbial OTUS present >99X, retain FISH ID
+  Hsubset<-H[c(rep(TRUE, 1), colSums(H[2:(NMicrobes+1)]) > 99)]
+  
+  
+  
+  Microbes<-grep(x = names(Hsubset), pattern = "^M",value=TRUE)
+  
+  #Extract Supertype names
+  Supertypes<-grep(x = names(Hsubset), pattern = "^S",value=TRUE)
+  
+  #Create a dataframe to store results
+  SupertypeMicrobeAnalysis<-data.frame()
+  
+  #GLM loop - store intercept, slope, se, p.value
+  for (valM in Microbes) {
+    for (valS in Supertypes) {
+      M<-valM
+      S<-valS
+      SM<-paste(valS,valM,sep="")
+      
+      fit <-glm(formula = Hsubset[,valS] ~ Hsubset[,valM], family = quasibinomial(link="logit"))
+      
+      slope <- coef(summary(fit))[2]
+      se <- coef(summary(fit))[4]
+      WaldZ <- slope/se
+      
+      df <- data.frame(SupertypeMicrobe = SM, Microbe = valM, Supertype = valS, slope = slope, se = se, z = WaldZ)
+      
+      
+      # bind rows of temporary data frame to the results data frame
+      SupertypeMicrobeAnalysis <- rbind(SupertypeMicrobeAnalysis, df)
+      
+    }
+  }
+  
+  View(SupertypeMicrobeAnalysis)
+  
+  
+  
+  #get top 32 microbe IDs by sum (and variance? etc)
+  
+  microbe_sums <- colSums(H[,-1], na.rm = TRUE)
+  top_microbes <- names(sort(microbe_sums, decreasing = TRUE)[1:32])
+  
+  #search SupertypeMicrobeAnalysis for analyses with microbes %in% top_microbes
+  
+  top_microbe_STMA <- SupertypeMicrobeAnalysis[SupertypeMicrobeAnalysis$Microbe %in% top_microbes, c("Microbe", "Supertype", "z")]
+  View(top_microbe_STMA)
+  return(top_microbe_STMA)
+} #microbes present 99+ times
+
+top_microbe_STMA <- calculate_data("GLMOTUSTv2.csv")
+
+
+
+
+
+
+calculate_relative_data <- function(f){
+  
+  H <- read.csv(file ="GLMOTUSTv2.csv", header = TRUE)
+  
+  NMicrobes<-length(grep(x = colnames(H), pattern = "^M"))
+  
+  #Count number of Supertype columns (^S)
+  NSupertypes<-length(grep(x = colnames(H), pattern = "^S"))
+  
+  #Total OTUS per fish - 8158 [Data are rarified to 8158]
+  
+  FishOTUS<-apply(H[2:NMicrobes], 1,sum)
+  
+  
+  #Extract microbial OTUS present >99X, retain FISH ID
+  Hsubset<-H[c(rep(TRUE, 1), colSums(H[2:(NMicrobes+1)]) > 99)]
+  
+  #Extract Microbe names
+  Microbes<-grep(x = names(Hsubset), pattern = "^M",value=TRUE)
+  
+  #Extract Supertype names
+  Supertypes<-grep(x = names(Hsubset), pattern = "^S",value=TRUE)
+  
+  Hrelative<-Hsubset
+  rownames(Hrelative) <- Hrelative[,1]
+  Hrelative[,1] <- NULL
+  
+  #Total microbe abundances
+  
+  apply(Hrelative[1:length(Microbes)], 2,sum)
+  
+  #Calculate microbe relative abundances
+  
+  Hrelative <- cbind(decostand(Hrelative[1:length(Microbes)], method = "total"), Hrelative[(length(Microbes)+1):length(Hrelative)])
+  
+  
+  #Create a dataframe to store results
+  SupertypeRelativeMicrobeAnalysis_relative<-data.frame()
+  
+  #GLM loop - store intercept, slope, p.value
+  for (valM in Microbes) {
+    for (valS in Supertypes) {
+      M<-valM
+      S<-valS
+      SM<-paste(valS,valM,sep="")
+      
+      fit <-glm(formula = Hrelative[,valS] ~ Hrelative[,valM], family = quasibinomial(link="logit"))
+      
+      ## capture summary stats
+      slope <- coef(summary(fit))[2]
+      se <- coef(summary(fit))[4]
+      WaldZ <- slope/se
+      
+      df <- data.frame(SupertypeMicrobe = SM, Microbe = valM, Supertype = valS, slope = slope, se = se, z = WaldZ)
+      
+      
+      
+      # bind rows of temporary data frame to the results data frame
+      SupertypeRelativeMicrobeAnalysis_relative <- rbind(SupertypeRelativeMicrobeAnalysis_relative, df)
+    }
+  }
+  
+  View(SupertypeRelativeMicrobeAnalysis_relative)
+  
+  #get top 32 microbe IDs by sum (and variance? etc)
+  
+  microbe_sums <- colSums(H[,-1], na.rm = TRUE)
+  top_microbes <- names(sort(microbe_sums, decreasing = TRUE)[1:32])
+  
+  #search SupertypeMicrobeAnalysis for analyses with microbes %in% top_microbes
+  
+  top_microbe_STMA_relative <- SupertypeRelativeMicrobeAnalysis_relative[SupertypeRelativeMicrobeAnalysis_relative$Microbe %in% top_microbes, c("Microbe", "Supertype", "z")]
+  View(top_microbe_STMA_relative)
+  return(top_microbe_STMA_relative)
+  
+} #all microbes
+
+top_microbe_STMA_relative <- calculate_relative_data("GLMOTUSTv2.csv")
+
+
+#make into heatmap afterwards
+#heatmap for relative data (all microbes used)
+
+relheatmap <- function(top_microbe_STMA_relative){
+  
+  min_z <- min(top_microbe_STMA_relative$z, na.rm = TRUE)
+  max_z <- max(top_microbe_STMA_relative$z, na.rm = TRUE)
+  mid_z <- (min_z + max_z)/2
+  
+  ggplot(top_microbe_STMA_relative, aes(x = Supertype, y = Microbe, fill = z)) +
+    geom_tile(color = "black") +
+    scale_fill_gradient2(
+      low = "blue", mid="hotpink", high = "red", 
+      midpoint=mid_z,
+      limits = c(min_z, max_z),
+      breaks = c(min_z, max_z),
+      labels = ceiling(c(min_z, max_z)), 
+      name = "Wald's Z"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.y = element_text(size = 8)
+    ) +
+    labs(title = "Microbe–Supertype Associations", x = "Supertype", y = "Microbe")
+}
+
+relheatmap(top_microbe_STMA_relative)
+
+#heatmap for normal analysis, only microbes 99+ times used
+
+notrel_heatmap <- function(top_microbe_STMA){
+  
+  min_z <- min(top_microbe_STMA$z, na.rm = TRUE)
+  max_z <- max(top_microbe_STMA$z, na.rm = TRUE)
+  mid_z <- (min_z + max_z)/2
+  
+  ggplot(top_microbe_STMA, aes(x = Supertype, y = Microbe, fill = z)) +
+    geom_tile(color = "black") +
+    scale_fill_gradient2(
+      low = "blue", mid="hotpink", high = "red", 
+      midpoint=mid_z,
+      limits = c(min_z, max_z),
+      breaks = c(min_z, max_z),
+      labels = ceiling(c(min_z, max_z)), 
+      name = "Wald's Z"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.y = element_text(size = 8)
+    ) +
+    labs(title = "Microbe–Supertype Associations", x = "Supertype", y = "Microbe")
+}
+
+notrel_heatmap(top_microbe_STMA)
+#get microbes' orders (in other excel sheet)
+
