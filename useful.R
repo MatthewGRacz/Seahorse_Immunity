@@ -28,7 +28,73 @@ library("ggVennDiagram")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
-#----#analyzes out file, flags base calls with confidence less than prob:----
+ABphasepath <- "PHASE_AB_2_17_2026/"
+Aphasepath <- gsub("AB", "A", ABphasepath)
+Bphasepath <- gsub("AB", "B", ABphasepath)
+
+#----Clips AB sequence into Alpha/Beta:----
+
+get_alpha <- function(seqs){
+  
+  cut_point <- 246
+  
+  num_sequences <- length(seqs)
+  
+  all_seqs <- list()
+  all_names <- c()
+  
+  for(i in 1:num_sequences){ #for each unique allele
+    
+    #readseq <- read.fasta(seqs[i], as.string=TRUE)
+    alpha <- toupper(substr(seqs[i], start=1, stop=cut_point))
+    
+    names(alpha) <- rep(names(seqs[i]), length(alpha))
+    all_seqs <- c(all_seqs, alpha)           # Add sequences to the list
+    all_names <- c(all_names, names(alpha))
+    
+    
+  }
+  
+  write.fasta(sequences = all_seqs, names = all_names, file.out = "PHASE_A_2_16_2026/GS_167_A")
+  
+}
+#gets alpha sections from GS 519bp sequences, puts them into FASTA file
+
+get_alpha(read.fasta(paste0(ABphasepath, "GS_167_AB.fasta"), as.string=TRUE))
+
+get_beta <- function(seqs){
+  
+  cut_point <- 247
+  
+  num_sequences <- length(seqs)
+  
+  all_seqs <- list()
+  all_names <- c()
+  
+  for(i in 1:num_sequences){ #for each unique allele
+    
+    #readseq <- read.fasta(seqs[i], as.string=TRUE)
+    beta <- toupper(substr(seqs[i], start=cut_point, stop=nchar(seqs[i])))
+    
+    names(beta) <- rep(names(seqs[i]), length(beta))
+    all_seqs <- c(all_seqs, beta)           # Add sequences to the list
+    all_names <- c(all_names, names(beta))
+    
+    
+  }
+  
+  write.fasta(sequences = all_seqs, names = all_names, file.out = "PHASE_B_2_16_2026/GS_167_B")
+  
+}
+#gets beta sections from GS 519bp sequences, puts them into FASTA file
+
+get_beta(read.fasta(paste0(ABphasepath, "GS_167_AB.fasta"), as.string=TRUE))
+
+#PHASE ALPHA WITH CLONES
+#PHASE BETA WITH CLONES
+
+
+#----Post-PHASE analaysis:----
 
 getOutNames <- function(readfile){
   
@@ -50,6 +116,7 @@ getOutNames <- function(readfile){
   return (outnames)
   
 }
+#gets names of sequences in out file
 
 getProbsOne <- function(fasta_one, out_one, prob){
   
@@ -79,30 +146,10 @@ getProbsOne <- function(fasta_one, out_one, prob){
   
   for(i in 1:length(indv_names)){#compare phased sequence of each shared individual to each other between fasta_one and fasta_two
     
-    #bps <- c(which(as.character(readfasta_one[[paste0(indv_names[i], "a")]]) != as.character(readfasta_two[[paste0(indv_names[i], "a")]])))
-    #bps <- bps[!is.na(bps)]
-    #bp positions where sequences differ between both alpha/beta fasta files
-    
-    #if(length(bps) > 0){ #there are differences between the two fasta sequences for the same individual, individual n
-    
     beginning = "BEGIN PHASEPROBS"
     
     probs_one <- c(as.numeric(unlist(strsplit(gsub("= ", "1.00 ", readout_one[sum(as.integer(grep(beginning, readout_one, value=FALSE)), as.integer(grep(indv_names[i], indv_names, value=FALSE)))]), " "))))
     #nth line down from "BEGIN PHASEPROBS" in the first out file, where n is individual n's position in the first fasta file
-    
-    #nth line down from "BEGIN PHASEPROBS" in the second out file, where n is individual n's position in the second fasta file
-    
-    #print(as.integer(grep(beginning, readout_one, value=FALSE)))
-    #print(indv_names[i])
-    #print(first_names)
-    #print(as.integer(grep(indv_names[i], first_names, value=FALSE)))
-    #print(as.integer(grep(indv_names[i], indv_names, value=FALSE)))
-    #print(second_names)
-    #print(as.integer(grep(indv_names[i], second_names, value=FALSE)))
-    #print(indv_names)
-    #print(as.integer(grep(indv_names[i], second_names, value=FALSE)))
-    #print(probs_one)
-    #print(probs_two)
     
     
     for(k in 1:length(varpos_a_or_b)){ #1:1 correlation of positions of bps in sequence and probabilities in sequences
@@ -118,107 +165,50 @@ getProbsOne <- function(fasta_one, out_one, prob){
     }
     
     
-    #}
-    
   }
   
   
 } 
+#gets confidences of base calls in out file, flags any with less confidence than prob
 
-getProbsOne("PHASE_AB_2_15_2026/GS_167_AB.fasta", 
-            "PHASE_AB_2_15_2026/seqphase.out",
+getProbsOne(paste0(ABphasepath, "GS_167_AB.fasta"), 
+            paste0(ABphasepath, "seqphase.out"),
             0.99)
 
-#cat(names(readDNAStringSet("PHASE_AB_2_15_2026/12_clones.fasta")))
+#clones are phased due to being included in the total number of sequences in the input file, 
+#which leads to N's and is redundant, so phased clones are excluded from AB phased alleles
 
-
-
-#----Clips AB sequence into Alpha/Beta:----
-
-get_alpha <- function(seqs){
+getNoClonePath <- function(seqs){
   
-  cut_point <- 246
+  return (paste0(sub(".fasta", "", seqs), "_ClonesRemoved"))
   
-  num_sequences <- length(seqs)
-  
-  all_seqs <- list()
-  all_names <- c()
-  
-  for(i in 1:num_sequences){ #for each unique allele
-    
-    #readseq <- read.fasta(seqs[i], as.string=TRUE)
-    alpha <- toupper(substr(seqs[i], start=1, stop=cut_point))
-    
-    names(alpha) <- rep(names(seqs[i]), length(alpha))
-    all_seqs <- c(all_seqs, alpha)           # Add sequences to the list
-    all_names <- c(all_names, names(alpha))
-    
-    
-  }
-  
-  write.fasta(sequences = all_seqs, names = all_names, file.out = "PHASE_A_2_16_2026/GS_167_A")
-  
-}
-
-get_alpha(read.fasta("PHASE_AB_2_15_2026/GS_167_AB.fasta", as.string=TRUE))
-
-get_beta <- function(seqs){
-  
-  cut_point <- 247
-  
-  num_sequences <- length(seqs)
-  
-  all_seqs <- list()
-  all_names <- c()
-  
-  for(i in 1:num_sequences){ #for each unique allele
-    
-    #readseq <- read.fasta(seqs[i], as.string=TRUE)
-    beta <- toupper(substr(seqs[i], start=cut_point, stop=nchar(seqs[i])))
-    
-    names(beta) <- rep(names(seqs[i]), length(beta))
-    all_seqs <- c(all_seqs, beta)           # Add sequences to the list
-    all_names <- c(all_names, names(beta))
-    
-    
-  }
-  
-  write.fasta(sequences = all_seqs, names = all_names, file.out = "PHASE_B_2_16_2026/GS_167_B")
-  
-}
-
-get_beta(read.fasta("PHASE_AB_2_15_2026/GS_167_AB.fasta", as.string=TRUE))
-
-#PHASE ALPHA WITH CLONES
-#PHASE BETA WITH CLONES
-
-#Count number of unique recombinants per alphabeta sequence
-
-#clones are phased due to being included in the total number of sequences in the input file, which leads to N's and is redundant, so phased clones are excluded from AB phased alleles
+} 
+#returns the path name for the phased_NoClones file
 
 removePhasedClones <- function(seqs){
   
-  readseqs <- read.fasta(seqs, as.string=TRUE)
+  readseqs <- read.fasta(paste0(Aphasepath, "phased.fasta"), as.string=TRUE)
   
   uniqueseqnames <- names(readseqs)[!duplicated(names(readseqs))] #only names of the unique, non-duplicated seqs
   
   uniqueseqs <- lapply(readseqs[!duplicated(names(readseqs))], toupper) #only the seqs with the unique, non-duplicated names
   
+  outpath <- getNoClonePath(seqs)
   
-  write.fasta(sequences = uniqueseqs, names = uniqueseqnames, file.out = paste0(sub(".fasta", "", seqs), "_ClonesRemoved"))
+  write.fasta(sequences = uniqueseqs, names = uniqueseqnames, file.out = outpath)
   
-}
+  
+} 
+#removes clones from phased file, as they usually are redundant, not useful, and/or have N's 
 
-removePhasedClones("PHASE_B_2_16_2026/B_phased.fasta")
-removePhasedClones("PHASE_A_2_16_2026/A_phased.fasta")
-removePhasedClones("PHASE_AB_2_15_2026/AB_phased.fasta")
+suppressWarnings(removePhasedClones(Aphasepath))
+suppressWarnings(removePhasedClones(Bphasepath))
+suppressWarnings(removePhasedClones(ABphasepath))
 
-
-#checks if any non-clone alleles have N's in them
 
 hasNs <- function(seqs){
   
-  readseqs <- read.fasta(seqs, as.string=TRUE)
+  readseqs <- read.fasta(getNoClonePath(paste0(seqs, "phased.fasta")), as.string=TRUE)
   
   totalmasks <- c()
   
@@ -235,39 +225,61 @@ hasNs <- function(seqs){
       cat(paste0(i, " at bp(s): ", paste(Nmask, collapse = ", "))) #print bps where Ns appear
       cat("\n")
       
+      
     }
     
   }
   
   if(length(totalmasks)==0){
     
-    cat("No N's in this file!") #if no Ns in all masks
+    cat(paste0("No N's in ", paste0(Aphasepath, "phased.fasta"), "!")) #if no Ns in all masks
     cat("\n")
+    return (TRUE)
     
   }
   
+  return (FALSE) #if function gets here, didn't return TRUE, hence Nmask is not empty
   
-} #checks if Ns in phased alleles with clones removed
-
-hasNs("PHASE_A_2_16_2026/A_phased_ClonesRemoved")
-hasNs("PHASE_B_2_16_2026/B_phased_ClonesRemoved")
-hasNs("PHASE_AB_2_15_2026/AB_phased_ClonesRemoved")
+  
+} 
+#checks if any non-clone alleles have N's in them
 
 hasRetainedAlleles <- function(Aseqs, Bseqs, ABseqs){
   
-  cat(paste0("Do AB and A and B have same number of alleles? ", (union(length(names(read.fasta(Aseqs, as.string=TRUE))), length(names(read.fasta(Bseqs, as.string=TRUE))))/2)-(length(names(read.fasta(ABseqs, as.string=TRUE)))/2)==0))
+  hasSameNumAlleles <- (((length(union((names(read.fasta(getNoClonePath(paste0(Aseqs, "phased.fasta")), as.string=TRUE))), (names(read.fasta(getNoClonePath(paste0(Bseqs, "phased.fasta")), as.string=TRUE)))))/2) - (length((names(read.fasta(getNoClonePath(paste0(ABseqs, "phased.fasta")), as.string=TRUE))))/2)) == 0)
+  
+  #checks if the same allele names are in A and B, and compares it to the number of allele names in AB; it subtracts the numbers of A_and_B alleles from AB alleles, and if it equals zero, they must have the same allele names and quantities, hence no alleles lost
+  
+  cat(paste0("Do AB and A and B have same number of alleles? ", hasSameNumAlleles))
+  cat("\n")
+  
+  return(hasSameNumAlleles)
+
+} 
+#checks that no alleles were lost when clones removed
+
+
+if( hasNs(Aphasepath) && hasNs(Aphasepath) && hasNs(Aphasepath) && hasRetainedAlleles(Aphasepath, Bphasepath, ABphasepath) ){
+  
+  cat("\n")
+  cat("Files have no N's and no alleles lost, you may proceed")
+  cat("\n")
+  
+} else {
+  
+  cat("\n")
+  cat("Do NOT proceed")
+  cat("Check previous messages for source of error")
   cat("\n")
   
 }
-
-hasRetainedAlleles("PHASE_A_2_16_2026/A_phased_ClonesRemoved", "PHASE_B_2_16_2026/B_phased_ClonesRemoved", "PHASE_AB_2_15_2026/AB_phased_ClonesRemoved")
-
+#if no N's in alleles and no alleles lost, analysis may continue
 
 getUniqueRecombs <- function(Aseqs, Bseqs, ABseqs){ #creates recombinants of AB sequences, gets number of unique AB recombs, gets number of unique combinations of Alpha and Beta alleles, compares them
   
-  readAseqs <- read.fasta(Aseqs, as.string=TRUE)
-  readBseqs <- read.fasta(Bseqs, as.string=TRUE)
-  readABseqs <- read.fasta(ABseqs, as.string=TRUE)
+  readAseqs <- read.fasta(getNoClonePath(paste0(Aseqs, "phased.fasta")), as.string=TRUE)
+  readBseqs <- read.fasta(getNoClonePath(paste0(Bseqs, "phased.fasta")), as.string=TRUE)
+  readABseqs <- read.fasta(getNoClonePath(paste0(ABseqs, "phased.fasta")), as.string=TRUE)
   
   cut_point = 246 #length of alpha sequence, bps after are beta
   
@@ -356,7 +368,9 @@ getUniqueRecombs <- function(Aseqs, Bseqs, ABseqs){ #creates recombinants of AB 
   cat(paste0("Total number of unique recombinants in AB: ", length(AB_unique)))
   cat("\n")
   
-  x=list("AB_unique"=unlist(AB_unique), "A_B_unique"=unlist(A_B_unique))
+  x=list("AB unique"=unlist(AB_unique), "AlphaBeta unique"=unlist(A_B_unique))
+  
+  maxval <- max(length(AB_unique), length(A_B_unique), length(union(AB_unique, A_B_unique)) )
   
   venndiag <- ggVennDiagram(x, 
                       label_alpha = 0, 
@@ -365,25 +379,28 @@ getUniqueRecombs <- function(Aseqs, Bseqs, ABseqs){ #creates recombinants of AB 
                       label_color = "white",
                       set_color = "white"
                       ) + 
-    scale_fill_gradient2(low = "blue", mid = "hotpink", high = "red",
-                         midpoint=length(union(AB_unique, A_B_unique)) / 2) +
     
-    theme(plot.margin = margin(0, 50, 0, 50),
-          
+    scale_fill_gradient2(low = "blue", mid = "hotpink", high = "red",
+                         
+                         limits= c(0, maxval),
+                         midpoint= maxval/2,
+                         name="Number of Alleles") +
+    
+    theme(plot.margin = margin(0, 20, 0, 50),
           plot.background = element_rect(fill = "navy", color = NA),
           legend.background = element_rect(fill = "skyblue"),
-          legend.margin = margin(3, 3, 3, 3)
-          
-          
-          ) + 
+          legend.margin = margin(3, 3, 9, 3)) +
+    
       coord_cartesian(clip = "off")
     
     print(venndiag)
   
   
-} #gets number of unique AlphaBeta recombs, AB recombs, compares them, and makes Venn Diagram of results
+} 
+#gets number of unique AlphaBeta recombs, AB recombs, compares them, 
+#and makes Venn Diagram of results
 
-getUniqueRecombs("PHASE_A_2_16_2026/A_phased_ClonesRemoved", "PHASE_B_2_16_2026/B_phased_ClonesRemoved", "PHASE_AB_2_15_2026/AB_phased_ClonesRemoved")
+suppressMessages(suppressWarnings(getUniqueRecombs(Aphasepath, Bphasepath, ABphasepath)))
 
 
 
