@@ -28,7 +28,7 @@ library("ggVennDiagram")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
-ABphasepath <- "PHASE_AB_2_17_2026/"
+ABphasepath <- "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/"
 Aphasepath <- gsub("AB", "A", ABphasepath)
 Bphasepath <- gsub("AB", "B", ABphasepath)
 
@@ -55,7 +55,7 @@ get_alpha <- function(seqs){
     
   }
   
-  write.fasta(sequences = all_seqs, names = all_names, file.out = "PHASE_A_2_16_2026/GS_167_A")
+  write.fasta(sequences = all_seqs, names = all_names, file.out = gsub("AB", "A", seqs))
   
 }
 #gets alpha sections from GS 519bp sequences, puts them into FASTA file
@@ -83,7 +83,7 @@ get_beta <- function(seqs){
     
   }
   
-  write.fasta(sequences = all_seqs, names = all_names, file.out = "PHASE_B_2_16_2026/GS_167_B")
+  write.fasta(sequences = all_seqs, names = all_names, file.out = gsub("AB", "B", seqs))
   
 }
 #gets beta sections from GS 519bp sequences, puts them into FASTA file
@@ -92,7 +92,6 @@ get_beta(read.fasta(paste0(ABphasepath, "GS_167_AB.fasta"), as.string=TRUE))
 
 #PHASE ALPHA WITH CLONES
 #PHASE BETA WITH CLONES
-
 
 #----Post-PHASE analaysis:----
 
@@ -187,13 +186,15 @@ getNoClonePath <- function(seqs){
 
 removePhasedClones <- function(seqs){
   
-  readseqs <- read.fasta(paste0(Aphasepath, "phased.fasta"), as.string=TRUE)
+  readseqsname <- paste0(seqs, "phased.fasta")
+  
+  readseqs <- read.fasta(readseqsname, as.string=TRUE)
   
   uniqueseqnames <- names(readseqs)[!duplicated(names(readseqs))] #only names of the unique, non-duplicated seqs
   
   uniqueseqs <- lapply(readseqs[!duplicated(names(readseqs))], toupper) #only the seqs with the unique, non-duplicated names
   
-  outpath <- getNoClonePath(seqs)
+  outpath <- getNoClonePath(readseqsname)
   
   write.fasta(sequences = uniqueseqs, names = uniqueseqnames, file.out = outpath)
   
@@ -232,7 +233,7 @@ hasNs <- function(seqs){
   
   if(length(totalmasks)==0){
     
-    cat(paste0("No N's in ", paste0(Aphasepath, "phased.fasta"), "!")) #if no Ns in all masks
+    cat(paste0("No N's in ", paste0(seqs, "phased.fasta"), "!")) #if no Ns in all masks
     cat("\n")
     return (TRUE)
     
@@ -259,7 +260,7 @@ hasRetainedAlleles <- function(Aseqs, Bseqs, ABseqs){
 #checks that no alleles were lost when clones removed
 
 
-if( hasNs(Aphasepath) && hasNs(Aphasepath) && hasNs(Aphasepath) && hasRetainedAlleles(Aphasepath, Bphasepath, ABphasepath) ){
+if( hasNs(Aphasepath) && hasNs(Bphasepath) && hasNs(ABphasepath) && hasRetainedAlleles(Aphasepath, Bphasepath, ABphasepath) ){
   
   cat("\n")
   cat("Files have no N's and no alleles lost, you may proceed")
@@ -275,11 +276,27 @@ if( hasNs(Aphasepath) && hasNs(Aphasepath) && hasNs(Aphasepath) && hasRetainedAl
 }
 #if no N's in alleles and no alleles lost, analysis may continue
 
+
 getUniqueRecombs <- function(Aseqs, Bseqs, ABseqs){ #creates recombinants of AB sequences, gets number of unique AB recombs, gets number of unique combinations of Alpha and Beta alleles, compares them
   
   readAseqs <- read.fasta(getNoClonePath(paste0(Aseqs, "phased.fasta")), as.string=TRUE)
   readBseqs <- read.fasta(getNoClonePath(paste0(Bseqs, "phased.fasta")), as.string=TRUE)
   readABseqs <- read.fasta(getNoClonePath(paste0(ABseqs, "phased.fasta")), as.string=TRUE)
+  
+  readoutfileA <- readLines(paste0(Aseqs, "seqphase.out"))
+  readoutfileB <- readLines(paste0(Bseqs, "seqphase.out"))
+  readoutfileAB <- readLines(paste0(ABseqs, "seqphase.out"))
+  
+  ending = "END LIST_SUMMARY"
+  
+  lastlineA <- as.integer(grep(ending, readoutfileA, value=FALSE)) -1
+  lastlineB <- as.integer(grep(ending, readoutfileB, value=FALSE)) -1
+  lastlineAB <- as.integer(grep(ending, readoutfileAB, value=FALSE)) -1
+  
+  uniqueAalleles <- as.numeric(sub(".*?(\\d+).*", "\\1", readoutfileA[lastlineA])) 
+  #gets first number, which is the nth allele, where n is the number of unique alleles PHASE reports
+  uniqueBalleles <- as.numeric(sub(".*?(\\d+).*", "\\1", readoutfileB[lastlineB]))
+  uniqueABalleles <- as.numeric(sub(".*?(\\d+).*", "\\1", readoutfileAB[lastlineAB]))
   
   cut_point = 246 #length of alpha sequence, bps after are beta
   
@@ -350,6 +367,15 @@ getUniqueRecombs <- function(Aseqs, Bseqs, ABseqs){ #creates recombinants of AB 
   
   AB_unique <- unique(AB_recombs)
   
+  cat(paste0("Total number of unique alleles in AB: ", uniqueABalleles))
+  cat("\n")
+  
+  cat(paste0("Total number of unique alleles in A: ", uniqueAalleles))
+  cat("\n")
+  
+  cat(paste0("Total number of unique alleles in B: ", uniqueBalleles))
+  cat("\n")
+  
   cat(paste0("Total number of unique recombinants that are in both AlphaBeta and AB: ", length(intersect(AB_unique, A_B_unique))))
   cat("\n")
   
@@ -371,6 +397,7 @@ getUniqueRecombs <- function(Aseqs, Bseqs, ABseqs){ #creates recombinants of AB 
   x=list("AB unique"=unlist(AB_unique), "AlphaBeta unique"=unlist(A_B_unique))
   
   maxval <- max(length(AB_unique), length(A_B_unique), length(union(AB_unique, A_B_unique)) )
+  minval <- 0#min(length(AB_unique), length(A_B_unique), length(union(AB_unique, A_B_unique)) )
   
   venndiag <- ggVennDiagram(x, 
                       label_alpha = 0, 
@@ -382,8 +409,10 @@ getUniqueRecombs <- function(Aseqs, Bseqs, ABseqs){ #creates recombinants of AB 
     
     scale_fill_gradient2(low = "blue", mid = "hotpink", high = "red",
                          
-                         limits= c(0, maxval),
-                         midpoint= maxval/2,
+                         limits= c(minval, maxval),
+                         breaks = c(minval, maxval),
+                         labels = c(minval, maxval),
+                         midpoint= (maxval-minval)/2,
                          name="Number of Alleles") +
     
     theme(plot.margin = margin(0, 20, 0, 50),
@@ -406,8 +435,6 @@ suppressMessages(suppressWarnings(getUniqueRecombs(Aphasepath, Bphasepath, ABpha
 
 
 #----Build Wald's Z recombinant-microbe heatmap (WIP):----
-
-
 
 ST_threshold <- 0.3
 
@@ -628,7 +655,7 @@ relheatmap <- function(top_microbe_STMA_relative){
       axis.text.x = element_text(angle = 45, hjust = 1),
       axis.text.y = element_text(size = 8)
     ) +
-    labs(title = "Microbe–Supertype Associations", x = "Supertype", y = "Microbe")
+    labs(title = "Microbe–Supertype Associations for All Microbes", x = "Supertype", y = "Microbe")
 }
 
 relheatmap(top_microbe_STMA_relative)
@@ -656,11 +683,14 @@ notrel_heatmap <- function(top_microbe_STMA){
       axis.text.x = element_text(angle = 45, hjust = 1),
       axis.text.y = element_text(size = 8)
     ) +
-    labs(title = "Microbe–Supertype Associations", x = "Supertype", y = "Microbe")
+    labs(title = "Microbe–Supertype Associations for Microbes Present 99+ Times", x = "Supertype", y = "Microbe")
 }
 
 notrel_heatmap(top_microbe_STMA)
 #get microbes' orders (in other excel sheet)
+
+
+
 
 
 
