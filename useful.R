@@ -172,7 +172,7 @@ getProbsOne <- function(fasta_one, out_one, prob){
 
 getProbsOne(paste0(ABphasepath, "GS_167_AB.fasta"), 
             paste0(ABphasepath, "seqphase.out"),
-            0.99)
+            0.7)
 
 #clones are phased due to being included in the total number of sequences in the input file, 
 #which leads to N's and is redundant, so phased clones are excluded from AB phased alleles
@@ -693,6 +693,86 @@ notrel_heatmap(top_microbe_STMA)
 
 
 
+
+
+
+
+
+
+
+
+get_recombs <- function(alpha_phasepath, beta_phasepath){
+  
+  alpha_phasepath <- paste0(alpha_phasepath, "phased.fasta")
+  beta_phasepath <- paste0(beta_phasepath, "phased.fasta")
+  #file with the phased alleles
+  
+  alpha_seqs <- read.fasta(alpha_phasepath, as.string = TRUE)
+  beta_seqs <- read.fasta(beta_phasepath, as.string = TRUE)
+  
+  if(sum(names(alpha_seqs) != names(beta_seqs)) == 0){cat("Good to go!\n")}
+  #all sequence names are the same 
+  
+  names <- unique(gsub("[ab]$", "", names(alpha_seqs)))
+  #get names of individuals whose sequences you're looking at
+  
+  a1b1 <- toupper(paste0(alpha_seqs[paste0(names, "a")], substr(beta_seqs[paste0(names, "a")], 3, 272)))
+  #a = 1st allele, b = 2nd allele, per individual
+  #the snipped betas have 2 extra bps ahead and 1 extra bp behind, so cut them out
+  #trims to functional reading frames
+  a1b2 <- toupper(paste0(alpha_seqs[paste0(names, "a")], substr(beta_seqs[paste0(names, "b")], 3, 272)))
+  a2b1 <- toupper(paste0(alpha_seqs[paste0(names, "b")], substr(beta_seqs[paste0(names, "a")], 3, 272)))
+  a2b2 <- toupper(paste0(alpha_seqs[paste0(names, "b")], substr(beta_seqs[paste0(names, "b")], 3, 272)))
+  
+  return(c(
+    
+    setNames(a1b1, paste0(names, "_a1b1")),
+    setNames(a1b2, paste0(names, "_a1b2")),
+    setNames(a2b1, paste0(names, "_a2b1")),
+    setNames(a2b2, paste0(names, "_a2b2"))
+    
+  ))
+  
+}
+
+remove_recco <- function(recombs, pipeline_phasepath){
+  
+  recco_phasepath <- paste0(pipeline_phasepath, "recco_results.csv")
+  
+  recco_names <- read.delim(recco_phasepath)$Sequence
+  #RECCO's output file is TSV, not CSV like it says
+  
+  return(recombs[!names(recombs) %in% recco_names])
+  
+}
+
+main <- function(ABphasepath, pipeline_phasepath){
+  
+  #with good alleles, make recombinants (a1b1, a1b2, etc)
+  #get FASTA DNA sequences of alleles from PHASED alleles
+  #Alpha Alleles and Beta Alleles, glue them together
+  
+  alpha_phasepath <- gsub("AB", "A", ABphasepath)
+  beta_phasepath <- gsub("AB", "B", ABphasepath)
+  
+  recombs <- suppressWarnings(get_recombs(alpha_phasepath, beta_phasepath))
+  
+  write.fasta(as.list(recombs), names(recombs), file.out=paste0(pipeline_phasepath, "recombs.fasta"))
+  #FASTA file of recombs
+  
+  #run RECCO analyses on recombinants
+  
+  recombs <- suppressWarnings(remove_recco(recombs, pipeline_phasepath))
+  
+  write.fasta(as.list(recombs), names(recombs), file.out=paste0(pipeline_phasepath, "recombs_postRECCO.fasta"))
+  
+  #send post-RECCO alleles to DataMonkey
+  
+  
+  
+}
+
+main("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/", "Pipeline/")
 
 
 
