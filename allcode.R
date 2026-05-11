@@ -477,7 +477,8 @@ getProbsOne <- function(fasta_one, out_one, prob){
         if(probs_one[k] < prob){ 
           #is one of the alpha/beta out file loci mentioned the same position as a conflicting bp between two fasta sequences, or is its allelic position inferred with under 90% confidence?
           
-          print(paste0(indv_names[i], " at bp ", varpos_a_or_b[k], ": ", probs_one[k]))
+          cat(paste0(indv_names[i], " at bp ", varpos_a_or_b[k], ": ", probs_one[k]))
+          cat("\n")
           
         }
         
@@ -491,9 +492,9 @@ getProbsOne <- function(fasta_one, out_one, prob){
   
 } #USE THIS ONE
 
-getProbsOne("/Users/mattracz/Projects/Wilson_Lab/PHASE_AB_2_15_2026/GS_AB.fasta", 
-            "/Users/mattracz/Projects/Wilson_Lab/PHASE_AB_2_15_2026/seqphase.out",
-            0.99)
+getProbsOne("/Users/mattracz/Projects/Wilson_Lab/PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/phased.fasta", 
+            "/Users/mattracz/Projects/Wilson_Lab/PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/seqphase.out",
+            0.95)
 
 print(names(readDNAStringSet("/Users/mattracz/Projects/Wilson_Lab/PHASE_AB_2_15_2026/knowns.fasta")))
 
@@ -1323,7 +1324,7 @@ View(zdata)
 
 
 d <- dapc(zdata[, setdiff(names(zdata), "grp")], zdata$grp, n.pca=47)
-optim.a.score(d, n.sim=30)
+optim.a.score(d, n.sim=30) #BIC ANALYSIS, MAKE 250 DONE BY HAND
 
 
 #----Generates Random RNA, DNA, and Protein FASTA Sequences:----
