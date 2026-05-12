@@ -24,6 +24,7 @@ library("modeest")
 library("umap")
 library("ggplot2")
 library("ggVennDiagram")
+library("jsonlite")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
@@ -85,9 +86,64 @@ get_translation <- function(recombs){
 
 get_datamonkey <- function(slac, meme, fel){
   
+  slac <- read.csv(slac)
+  
+  slac_sites <- c(slac[slac$"P..dN.dS...1." < 0.05, ]$"Site")
+  #CSV compresses headers; this corresponds with the positive selection header
+  #P [dN/dS > 1]
+  
+  meme <- fromJSON(meme)$MLE$content$`0`
+  #where the data lies
+  
+  meme_sites <- c(which(meme[,7] < 0.05))
+  #7th column is p values, and all p values < 0.05 are pos selection
+  
+  fel <- fromJSON(fel)$MLE$content$`0`
+  
+  fel_sites <- c(which(fel[,5] < 0.05))
+  #5th column is p values, and all p values < 0.05 are pos selection
+  
+  freq_table <- table(c(slac_sites, meme_sites, fel_sites))
+  
+  return(c(as.numeric(names(freq_table[freq_table >= 2]))))
+  #return numbers which appear at least twice
   
   
+}
+
+get_z_scores <- function(recomb_proteins_pos_sel, datamonkey_codons){
   
+  return(data.frame(
+    do.call(rbind, 
+            zScales(recomb_proteins_pos_sel)), 
+    row.names = names(recomb_proteins_pos_sel)))
+  
+}
+
+get_pos_sel_proteins <- function(recomb_proteins, datamonkey_codons){
+  
+  return(c(lapply(recomb_proteins, function(x){
+    
+    return(paste(unlist(x)[datamonkey_codons], collapse=""))
+    #get positively selected amino acids at datamonkey positions, then return as strings
+    
+  })))
+  
+}
+
+get_dapc_analysis <- function(zscores){
+  
+  cluster_data <- find.clusters(zscores, max.n.clust=40, n.da=1000, n.pca=5)
+  #shows BIC graph of clusters, to find optimal number of clusters
+  #keep PCA=5 for there are 5 Z-scores total, even if 3 carry 90% of the variance
+  #n.da set high will automatically find the maximum number of axes for the cluster comparisons
+  
+  dapc_data <- dapc(zscores, cluster_data$grp, n.pca=5)
+  #DAPC analysis on Z-scores with the number of groups from the cluster analysis
+  #still all 5 PCs kept from before for all 5 Z-scores
+  
+  optim.a.score(dapc_data)
+  #find the optimal number of principal components
   
 }
 
@@ -125,19 +181,26 @@ main <- function(ABphasepath, pipeline_phasepath){
   recomb_proteins <- get_translation(recombs)
   
   recombs <- recombs[names(recombs) %in% names(recomb_proteins)]
-  #only include sequences which didn't produce a * 
-  #send these to DataMonkey
+  #only include sequences which didn't produce a * (stop codon)
   
   write.fasta(as.list(recombs), 
-              names(recomb_proteins), 
+              names(recombs), 
               file.out=paste0(pipeline_phasepath, "recombs_postRECCO.fasta"))
   
   #overwrite the post-RECCO recombs file with recombs which do not produce a *
+  #send these to DataMonkey
   
-  get_datamonkey(paste0(pipeline_phasepath, "slac"), 
-                 paste0(pipeline_phasepath, "meme"), 
-                 paste0(pipeline_phasepath, "fel"))
+  datamonkey_codons <- get_datamonkey(paste0(pipeline_phasepath, "slac.csv"), 
+                                      paste0(pipeline_phasepath, "meme.json"), 
+                                      paste0(pipeline_phasepath, "fel.json"))
   
+  #get positions of amino acids under positive selection in sampled pops
+  
+  recomb_proteins_pos_sel <- get_pos_sel_proteins(recomb_proteins, datamonkey_codons)
+  #get codons of amino acids which are under positive selection in sampled pops
+  
+  zscores <- get_z_scores(recomb_proteins_pos_sel)
+  #makes Z-scores of each immune protein into a data frame
   
   
   
