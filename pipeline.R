@@ -128,11 +128,15 @@ get_dapc_analysis <- function(zscores, num_tests){
   cluster_estimates <- c()
   
   cluster_estimates <- c(cluster_estimates, replicate(num_tests, length(find.clusters(zscores,
-                          n.pca=ncol(zscores))$size)))
+                          n.pca=ncol(zscores), max.n.clust=50)$size)))
+  
+  #estimate number of clusters based on BIC graph num_tests number of times
   
   cluster_estimates_table <- table(cluster_estimates)
   
   cluster_mode <- mean(c(as.numeric(names(cluster_estimates_table[cluster_estimates_table >= max(cluster_estimates_table)]))))
+  
+  #gets mode of the cluster estimates
   
   cat("Mode Cluster Estimate: ", cluster_mode, "\n")
   cat("Median Cluster Estimate: ", median(cluster_estimates), "\n")
@@ -232,6 +236,8 @@ main <- function(ABphasepath, pipeline_phasepath){
   #makes Z-scores of each immune amino acid into a data frame
   
   best_dapc <- get_dapc_analysis(zscores, 3)
+  #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
+  #returns a DAPC with the optimal number of PCs
   
   print(best_dapc)
   
