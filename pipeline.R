@@ -1,29 +1,10 @@
-library("dplyr")
-library("vegan")
-library("readxl")
-library("adegenet")
-library("BiocManager")
-library("devtools")
-library("rBLAST")
-library("biomartr")
 library("Biostrings")
-library("GenomicRanges")
-library("IRanges")
-library("S4Vectors")
 library("seqinr")
 library("utils")
-library("metagenomeFeatures")
-library("qiime2R")
-library("rentrez")
-library("DBI")
-library("XML")
 library("adegenet")
 #remotes::install_version("Peptides", version = 2.4) #version used in analysis
 library("Peptides")
-library("modeest")
-library("umap")
 library("ggplot2")
-library("ggVennDiagram")
 library("jsonlite")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
@@ -113,37 +94,85 @@ get_datamonkey <- function(slac, meme, fel){
 
 get_z_scores <- function(recomb_proteins_pos_sel, datamonkey_codons){
   
-  return(data.frame(
-    do.call(rbind, 
-            zScales(recomb_proteins_pos_sel)), 
-    row.names = names(recomb_proteins_pos_sel)))
+  return(
+    
+    data.frame(
+      
+      do.call(rbind, lapply(recomb_proteins_pos_sel, function(x){
+        
+        unlist(zScales(x)) }
+            
+            ))
+      
+      ))
+  
+  #gets the Z-score for each amino acid in the list, then makes it a vector
+  #then binds those vectors to a data frame and returns it
   
 }
 
 get_pos_sel_proteins <- function(recomb_proteins, datamonkey_codons){
   
-  return(c(lapply(recomb_proteins, function(x){
+  return(lapply(recomb_proteins, function(x){  
     
-    return(paste(unlist(x)[datamonkey_codons], collapse=""))
-    #get positively selected amino acids at datamonkey positions, then return as strings
+    return(x[datamonkey_codons])
+    #get positively selected amino acids at datamonkey positions
+    #returns as list of amino acids
     
-  })))
+  }))
   
 }
 
-get_dapc_analysis <- function(zscores){
+get_dapc_analysis <- function(zscores, num_tests){
   
-  cluster_data <- find.clusters(zscores, max.n.clust=40, n.da=1000, n.pca=5)
+  cluster_estimates <- c()
+  
+  cluster_estimates <- c(cluster_estimates, replicate(num_tests, length(find.clusters(zscores,
+                          n.pca=ncol(zscores))$size)))
+  
+  cluster_estimates_table <- table(cluster_estimates)
+  
+  cluster_mode <- mean(c(as.numeric(names(cluster_estimates_table[cluster_estimates_table >= max(cluster_estimates_table)]))))
+  
+  cat("Mode Cluster Estimate: ", cluster_mode, "\n")
+  cat("Median Cluster Estimate: ", median(cluster_estimates), "\n")
+  cat("Average Cluster Estimate: ", mean(cluster_estimates), "\n")
+  cat("Range Cluster Estimate: ", diff(range(cluster_estimates)), "\n")
+  cat("Min Cluster Estimate: ", min(range(cluster_estimates)), "\n")
+  cat("Max Cluster Estimate: ", max(range(cluster_estimates)), "\n")
+  
+  
+  cluster_data <- find.clusters(zscores, 
+                                n.clust=cluster_mode,
+                                n.pca=ncol(zscores))
   #shows BIC graph of clusters, to find optimal number of clusters
-  #keep PCA=5 for there are 5 Z-scores total, even if 3 carry 90% of the variance
-  #n.da set high will automatically find the maximum number of axes for the cluster comparisons
+  #keep n.pca=ncol(zscores) because you want to use all the variance possible, to overshoot
+  #the mode cluster number is used as the number of clusters
   
-  dapc_data <- dapc(zscores, cluster_data$grp, n.pca=5)
-  #DAPC analysis on Z-scores with the number of groups from the cluster analysis
-  #still all 5 PCs kept from before for all 5 Z-scores
+  test_dapc <- dapc(zscores, 
+                    cluster_data$grp, 
+                    n.pca=ncol(zscores), 
+                    n.da=ncol(zscores))
+
+  #all PCs kept from find.clusters for all amino acids' Z-scores
+  #overshooting helps use all values between 1 and the overshot npca number
+  #helps to find the most conservative, statistically probable npca number
+  #n.da maxes out at n.pca-1, finds the maximum number of axes for the cluster comparisons; 
+  #setting n.da too high will cause it to self-correct to the maximum possible value
+
+  a_spline_data <- optim.a.score(test_dapc)
+  #finds the optimal number of principal components
   
-  optim.a.score(dapc_data)
-  #find the optimal number of principal components
+  final_dapc <- dapc(zscores, 
+                     grp = cluster_data$grp, 
+                     n.pca = a_spline_data$best,
+                     n.da = a_spline_data$best)
+  
+  #the groups are the actual separated groups using the best data, accounting for every minor detail
+  #DAPC can now get the best analysis of the recombinants using only the optimized number of PCs
+  #it looks at the top n.pca separations and keeps those, while the rest are deleted
+  
+  return(final_dapc)
   
 }
 
@@ -200,8 +229,11 @@ main <- function(ABphasepath, pipeline_phasepath){
   #get codons of amino acids which are under positive selection in sampled pops
   
   zscores <- get_z_scores(recomb_proteins_pos_sel)
-  #makes Z-scores of each immune protein into a data frame
+  #makes Z-scores of each immune amino acid into a data frame
   
+  best_dapc <- get_dapc_analysis(zscores, 3)
+  
+  print(best_dapc)
   
   
 }
