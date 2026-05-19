@@ -123,12 +123,16 @@ get_pos_sel_proteins <- function(recomb_proteins, datamonkey_codons){
   
 }
 
-get_dapc_analysis <- function(zscores, num_tests){
+get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
+  
+  #supertype and cluster used interchangeably here
   
   cluster_estimates <- c()
   
-  cluster_estimates <- c(cluster_estimates, replicate(num_tests, length(find.clusters(zscores,
-                          n.pca=ncol(zscores), max.n.clust=50)$size)))
+  cluster_estimates <- c(cluster_estimates, replicate(num_tests, length(
+    find.clusters(zscores,
+                  n.pca=ncol(zscores), 
+                  max.n.clust=40)$size)))
   
   #estimate number of clusters based on BIC graph num_tests number of times
   
@@ -136,19 +140,23 @@ get_dapc_analysis <- function(zscores, num_tests){
   
   cluster_mode <- mean(c(as.numeric(names(cluster_estimates_table[cluster_estimates_table >= max(cluster_estimates_table)]))))
   
+  cat("\n")
+  cat("Mode Cluster Estimate: ", cluster_mode, "\n")
+  
   #gets mode of the cluster estimates
   
-  cat("Mode Cluster Estimate: ", cluster_mode, "\n")
   cat("Median Cluster Estimate: ", median(cluster_estimates), "\n")
   cat("Average Cluster Estimate: ", mean(cluster_estimates), "\n")
   cat("Range Cluster Estimate: ", diff(range(cluster_estimates)), "\n")
   cat("Min Cluster Estimate: ", min(range(cluster_estimates)), "\n")
   cat("Max Cluster Estimate: ", max(range(cluster_estimates)), "\n")
   
+  #report other summary stats of the cluster estimates
   
   cluster_data <- find.clusters(zscores, 
                                 n.clust=cluster_mode,
                                 n.pca=ncol(zscores))
+  
   #shows BIC graph of clusters, to find optimal number of clusters
   #keep n.pca=ncol(zscores) because you want to use all the variance possible, to overshoot
   #the mode cluster number is used as the number of clusters
@@ -156,27 +164,139 @@ get_dapc_analysis <- function(zscores, num_tests){
   test_dapc <- dapc(zscores, 
                     cluster_data$grp, 
                     n.pca=ncol(zscores), 
-                    n.da=ncol(zscores))
+                    n.da=1000)
 
   #all PCs kept from find.clusters for all amino acids' Z-scores
   #overshooting helps use all values between 1 and the overshot npca number
   #helps to find the most conservative, statistically probable npca number
   #n.da maxes out at n.pca-1, finds the maximum number of axes for the cluster comparisons; 
   #setting n.da too high will cause it to self-correct to the maximum possible value
+  
+  cat("\n")
+  cat("Finding optimal number of PCs... This may take a moment...\n")
 
-  a_spline_data <- optim.a.score(test_dapc)
+  a_spline_data <- optim.a.score(test_dapc, n.sim=10)
   #finds the optimal number of principal components
   
   final_dapc <- dapc(zscores, 
                      grp = cluster_data$grp, 
                      n.pca = a_spline_data$best,
-                     n.da = a_spline_data$best)
+                     n.da = 1000)
   
   #the groups are the actual separated groups using the best data, accounting for every minor detail
   #DAPC can now get the best analysis of the recombinants using only the optimized number of PCs
   #it looks at the top n.pca separations and keeps those, while the rest are deleted
   
+  cat("\n")
+  cat(final_dapc$var * 100, "% of Variance explained using ", final_dapc$n.pca, " PCs and ", length(final_dapc$eig), "/", length(final_dapc$pca.eig), " eigenvalues")
+  #how much variance is captured by the optimal number of PCs, 
+  #and how many eigenvalues were possible
+  
+  indv_by_supertype_df <- data.frame(Recombinant = row.names(zscores),
+                                   Supertype = final_dapc$assign)
+  
+  #which cluster is each recombinant in
+  
+  recomb_by_supertype_graph <- (ggplot(indv_by_supertype_df,
+               aes(x=Recombinant, 
+                   y=Supertype, 
+                   col=Supertype)) +
+    geom_point(size = 4, alpha=0.7) +
+      labs(title="Recombinant by Supertype") +
+      theme(
+        axis.text.x = element_text(size = 6, 
+                                   angle = 90, 
+                                   hjust = 1, 
+                                   vjust=0.5, 
+                                   margin = margin(t = 5)), 
+                                   legend.position = "right",
+        axis.text.y = element_text(size = 45),
+        axis.title = element_text(size = 75, face = "bold"),
+        legend.title = element_text(size = 60, face = "bold"),
+        legend.text = element_text(size = 45),
+        plot.title = element_text(size = 90, face = "bold", hjust=0.5)) +
+      
+      guides(color = guide_legend(ncol = 1, reverse = TRUE)))
+  
+  ggsave(paste0(pipeline_phasepath, "Recombinant_by_Supertype_Graph.pdf"), 
+         plot = recomb_by_supertype_graph, 
+         width = 0.111*nrow(indv_by_supertype_df), 
+         height = 1.1 * nlevels(indv_by_supertype_df$Supertype), 
+         limitsize = FALSE)
+  
+  #saves the graph of the recombinants by supertype to pipeline folder
+  #each supertype is a different color, and each recombinant has an associated dot
+  #of that color at a height correlated with the supertype number
+  
+  cat("\n\nGenerating Multi-Dimensional Supertype Atlas PDF... Please wait...\n")
+  
+  da_columns <- paste0("LD", 1:final_dapc$n.da)
+  
+  all_pairs <- combn(da_columns, 2) 
+  
+  pdf(paste0(pipeline_phasepath,"Recombinant_by_Supertype_Atlas.pdf"), width = 12, height = 10)
+  
+  ind_coords <- data.frame(final_dapc$ind.coord, 
+                           Cluster = as.factor(final_dapc$assign))
+  
+  center_coords <- data.frame(final_dapc$grp.coord, 
+                              Cluster = rownames(final_dapc$grp.coord))
+
+  pair_list <- as.list(as.data.frame(all_pairs))
+  
+  invisible(lapply(pair_list, function(pair) {
+    
+    x_axis <- pair[1]
+    y_axis <- pair[2]
+    
+    p <- ggplot() +
+      geom_point(data = ind_coords, 
+                 aes(x = .data[[x_axis]], y = .data[[y_axis]], color = Cluster), 
+                 size = 2, alpha = 0.3) +
+      
+      geom_point(data = center_coords, 
+                 aes(x = .data[[x_axis]], y = .data[[y_axis]], fill = Cluster), 
+                 size = 10, shape = 21, color = "black", stroke = 1.5) +
+      
+      geom_text(data = center_coords, 
+                aes(x = .data[[x_axis]], y = .data[[y_axis]], label = Cluster), 
+                color = "white", fontface = "bold", size = 5) +
+      
+      theme_minimal() +
+      labs(title = paste("Evolutionary Map:", x_axis, "vs", y_axis),
+           x = x_axis,
+           y = y_axis) +
+      
+      theme(
+        plot.title = element_text(size = 20, face = "bold"),
+        axis.title = element_text(size = 16, face = "bold"),
+        legend.position = "none" 
+      )
+    
+    print(p) 
+  }))
+  
+  dev.off() 
+  
+  cat("Atlas Complete!\n")
+  
+  #this gets all of the linear discriminants and plots them against each other in a multi-page plot 
+  #helps visualize X-dimensional space, where X is the number of LDs
+  
   return(final_dapc)
+  
+}
+
+get_supertypes <- function(final_dapc){
+  
+  population_names <- sub("_.*", "", names(final_dapc$grp))
+  #remove underscore and all that follows to get base population name per recombinant
+  
+  return(data.frame(
+    POPULATION=population_names,
+    SUPERTYPE = final_dapc$grp))
+  
+  #get population for each recombinant and its suypertype (grp) 
   
 }
 
@@ -235,11 +355,19 @@ main <- function(ABphasepath, pipeline_phasepath){
   zscores <- get_z_scores(recomb_proteins_pos_sel)
   #makes Z-scores of each immune amino acid into a data frame
   
-  best_dapc <- get_dapc_analysis(zscores, 3)
+  final_dapc <- get_dapc_analysis(zscores, 1, pipeline_phasepath)
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
-  print(best_dapc)
+  supertype_df <- get_supertypes(final_dapc)
+  #gets supertypes of all recombinants and their population
+  
+  microbe_supertype_data <- read.csv(paste0(pipeline_phasepath, "GLMOTUSTv2.csv"))
+  #reads per microbe for individual fish, whose supertypes can be accessed with the previous dataframe
+  
+  supertype_df$SUPERTYPE[supertype_df$POPULATION %in% microbe_supertype_data$FISH]
+  #get supertypes of fish used in microbe association
+  #helps associate supertypes with certain microbes
   
   
 }
