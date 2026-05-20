@@ -6,6 +6,8 @@ library("adegenet")
 library("Peptides")
 library("ggplot2")
 library("jsonlite")
+library("vegan")
+library("tidyverse")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
@@ -368,6 +370,21 @@ main <- function(ABphasepath, pipeline_phasepath){
   supertype_df$SUPERTYPE[supertype_df$POPULATION %in% microbe_supertype_data$FISH]
   #get supertypes of fish used in microbe association
   #helps associate supertypes with certain microbes
+  
+  kept_microbe_data <- microbe_supertype_data[colSums(microbe_supertype_data[, 2:ncol(microbe_supertype_data)]) > 99]
+  #parts of microbe_supertype_data where there are at least 99 reads for a given microbe
+  
+  kept_microbe_data <- column_to_rownames(kept_microbe_data, "FISH")
+  #removes the $FISH column and makes it the row names instead 
+  
+  View(kept_microbe_data)
+  
+  kept_microbe_data_relative <- decostand(kept_microbe_data, "total")
+  #makes each read count relative to the total number of reads for that seahorse
+  
+  View(kept_microbe_data_relative)
+  
+  
   
   
 }
