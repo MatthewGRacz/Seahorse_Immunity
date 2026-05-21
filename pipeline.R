@@ -294,8 +294,7 @@ get_supertypes <- function(final_dapc){
   population_names <- sub("_.*", "", names(final_dapc$grp))
   #remove underscore and all that follows to get base population name per recombinant
   
-  return(data.frame(
-    POPULATION=population_names,
+  return(data.frame(POPULATION=population_names,
     SUPERTYPE = final_dapc$grp))
   
   #get population for each recombinant and its suypertype (grp) 
@@ -371,11 +370,22 @@ main <- function(ABphasepath, pipeline_phasepath){
   #get supertypes of fish used in microbe association
   #helps associate supertypes with certain microbes
   
-  kept_microbe_data <- microbe_supertype_data[colSums(microbe_supertype_data[, 2:ncol(microbe_supertype_data)]) > 99]
+  kept_microbe_names <- colnames(microbe_supertype_data)[grep(x = colnames(microbe_supertype_data), pattern = "^M",value=TRUE)]
+  #will be the same names as the relative data
+  
+  fish_names <- row.names(microbe_supertype_data)
+  
+  JLA_supertypes <- colnames(microbe_supertype_data)[grep(x = colnames(microbe_supertype_data), pattern = "^S",value=TRUE)]
+  
+  kept_microbe_supertype_data <- microbe_supertype_data[,!(colnames(microbe_supertype_data) %in% JLA_supertypes)]
+  #removes supertype values from rows, so can get count of microbe values to keep
+  
+  kept_microbe_data <- kept_microbe_supertype_data[colSums(kept_microbe_supertype_data[, 2:ncol(kept_microbe_supertype_data)]) > 99]
   #parts of microbe_supertype_data where there are at least 99 reads for a given microbe
   
-  kept_microbe_data <- column_to_rownames(kept_microbe_data, "FISH")
+  kept_microbe_data <- as.matrix(column_to_rownames(kept_microbe_data, "FISH"))
   #removes the $FISH column and makes it the row names instead 
+  #this is all numbers now, so it's a much lighter matrix
   
   View(kept_microbe_data)
   
@@ -383,6 +393,16 @@ main <- function(ABphasepath, pipeline_phasepath){
   #makes each read count relative to the total number of reads for that seahorse
   
   View(kept_microbe_data_relative)
+  
+  View(supertype_df)
+  
+  JLA_supertypes_matrix <- matrix(row.names = fish_names,
+         kept_microbe_data[JLA_supertypes])
+  
+  View(JLA_supertypes_matrix)
+  
+  
+  absolute_microbe_supertype_glm <- glm()
   
   
   
