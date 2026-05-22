@@ -301,6 +301,49 @@ get_supertypes <- function(final_dapc){
   
 }
 
+get_glm_analyses <- function(sm_data, kept_microbe_names, supertypes) {
+  
+  cat("\nCalculating GLM... This may take a moment...\n\n")
+  
+  supertype_microbe_combos <- expand.grid(Microbe = kept_microbe_names,
+                                          Supertype = supertypes,
+                                          stringsAsFactors = FALSE)
+  
+  #all SupertypeMicrobe combinations for GLM analyses
+  #helps establish statistical patterns between any combo
+  
+  GLMresults <- apply(supertype_microbe_combos, MARGIN = 1, FUN = function(supertype_microbe) {
+    
+    supertype <- unname(supertype_microbe["Supertype"])
+    microbe   <- unname(supertype_microbe["Microbe"])
+    
+    glm_analysis <- coef(summary(glm(sm_data[, supertype] ~ sm_data[, microbe], 
+               family = quasibinomial(link = "logit"))))
+    
+    
+    data.frame(
+      SUPERTYPE_MICROBE = paste0(supertype, microbe), 
+      MICROBE = microbe, 
+      SUPERTYPE = supertype, 
+      SLOPE = glm_analysis[2], 
+      SE = glm_analysis[4], 
+      WALDZ = (glm_analysis[2] / glm_analysis[4]),
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  #rid of pointless rownames by unnaming them
+  #run GLM analysis between all supertypes and microbes 
+  #(accessing parts of expand.grid is faster than nested for loops)
+  
+  return(do.call(rbind, GLMresults))
+  #return all GLM analyses info bound into dataframe
+  
+}                       
+
+
+
+
 get_microbe_supertype_analysis <- function(microbe_supertype_data, supertype_df){
   
   #reads per microbe for individual seahorse, whose supertypes can be accessed with the previous dataframe
@@ -337,16 +380,23 @@ get_microbe_supertype_analysis <- function(microbe_supertype_data, supertype_df)
   #this is all numbers now, so it's a much lighter matrix
   
   kept_microbe_data_relative <- decostand(kept_microbe_data, "total")
+  kept_microbe_data_relative <- cbind(kept_microbe_data_relative, microbe_supertype_data[, JLA_supertypes])
+
   #makes each read count relative to the total number of reads for that seahorse
+  #bind back the supertype data for GLM analyses
+
+  absolute_microbe_supertype_glm_df <- get_glm_analyses(microbe_supertype_data, colnames(kept_microbe_data), JLA_supertypes)
   
-  View(kept_microbe_data)
+  #run GLM on absolute values for microbe_supertype counts
   
+  relative_microbe_supertype_glm_df <- get_glm_analyses(microbe_supertype_data, colnames(kept_microbe_data_relative), JLA_supertypes)
   
-  absolute_microbe_supertype_glm <- glm()
+  #run GLM on relative values for microbe_supertype counts
   
+  View(absolute_microbe_supertype_glm_df)
+  View(relative_microbe_supertype_glm_df)
   
-  
-  
+  #Graph $WALDZ a heatmap!
   
 }
 
