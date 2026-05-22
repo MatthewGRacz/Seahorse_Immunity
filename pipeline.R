@@ -291,13 +291,62 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
 
 get_supertypes <- function(final_dapc){
   
-  population_names <- sub("_.*", "", names(final_dapc$grp))
+  seahorse_names <- sub("_.*", "", names(final_dapc$grp))
   #remove underscore and all that follows to get base population name per recombinant
   
-  return(data.frame(POPULATION=population_names,
+  return(data.frame(INDIVIDUAL=seahorse_names,
     SUPERTYPE = final_dapc$grp))
   
-  #get population for each recombinant and its suypertype (grp) 
+  #get population for each recombinant and its supertype (grp) 
+  
+}
+
+get_microbe_supertype_analysis <- function(microbe_supertype_data, supertype_df){
+  
+  #reads per microbe for individual seahorse, whose supertypes can be accessed with the previous dataframe
+  
+  analyzed_supertypes_df <- supertype_df[supertype_df$INDIVIDUAL %in% microbe_supertype_data$FISH, ]
+  #get rows of supertype_df with the same seahorse that are in the microbe_supertype_data 
+  #has their supertypes, so can compare with JLA's 
+  
+  kept_microbe_names <- grep(x = colnames(microbe_supertype_data), pattern = "^M",value=TRUE)
+  #will be the same names as the relative data
+  
+  JLA_supertypes <- grep(x = colnames(microbe_supertype_data), pattern = "^S",value=TRUE)
+  #supertypes (from JLA's DAPC analysis) associated with each seahorse 
+  
+  kept_microbe_data <- microbe_supertype_data[, !(colnames(microbe_supertype_data) %in% JLA_supertypes)]
+  #removes supertype values from rows, so can get count of microbe values to keep
+  
+  JLA_supertypes_data <- apply(microbe_supertype_data[, JLA_supertypes], 1, function(x){sub("^S", "", names(x)[as.logical(x)])})
+  #subsets the part of the microbe data that involves supertypes
+  #gets the name of each supertype with a 1 (logical mask) by individual seahorse name (row)
+  
+  JLA_supertypes_df <- data.frame(INDIVIDUAL = rep(microbe_supertype_data$FISH, times=lengths(JLA_supertypes_data)),
+                                  SUPERTYPE = as.numeric(unlist(JLA_supertypes_data)))
+  
+  #gets the supertype numbers for each seahorse and puts them into a dataframe
+  
+  kept_microbe_data <- kept_microbe_data[, c(TRUE, colSums(kept_microbe_data[, 2:ncol(kept_microbe_data)]) > 99)]
+  #parts of kept_microbe_data where there are at least 99 reads for a given microbe
+  #filter applies to all non-name columns
+  #then, selected columns and first column of names are selected 
+  
+  kept_microbe_data <- as.matrix(column_to_rownames(kept_microbe_data, "FISH"))
+  #removes the $FISH column and makes it the row names instead 
+  #this is all numbers now, so it's a much lighter matrix
+  
+  kept_microbe_data_relative <- decostand(kept_microbe_data, "total")
+  #makes each read count relative to the total number of reads for that seahorse
+  
+  View(kept_microbe_data)
+  
+  
+  absolute_microbe_supertype_glm <- glm()
+  
+  
+  
+  
   
 }
 
@@ -363,48 +412,8 @@ main <- function(ABphasepath, pipeline_phasepath){
   supertype_df <- get_supertypes(final_dapc)
   #gets supertypes of all recombinants and their population
   
-  microbe_supertype_data <- read.csv(paste0(pipeline_phasepath, "GLMOTUSTv2.csv"))
-  #reads per microbe for individual fish, whose supertypes can be accessed with the previous dataframe
-  
-  supertype_df$SUPERTYPE[supertype_df$POPULATION %in% microbe_supertype_data$FISH]
-  #get supertypes of fish used in microbe association
-  #helps associate supertypes with certain microbes
-  
-  kept_microbe_names <- colnames(microbe_supertype_data)[grep(x = colnames(microbe_supertype_data), pattern = "^M",value=TRUE)]
-  #will be the same names as the relative data
-  
-  fish_names <- row.names(microbe_supertype_data)
-  
-  JLA_supertypes <- colnames(microbe_supertype_data)[grep(x = colnames(microbe_supertype_data), pattern = "^S",value=TRUE)]
-  
-  kept_microbe_supertype_data <- microbe_supertype_data[,!(colnames(microbe_supertype_data) %in% JLA_supertypes)]
-  #removes supertype values from rows, so can get count of microbe values to keep
-  
-  kept_microbe_data <- kept_microbe_supertype_data[colSums(kept_microbe_supertype_data[, 2:ncol(kept_microbe_supertype_data)]) > 99]
-  #parts of microbe_supertype_data where there are at least 99 reads for a given microbe
-  
-  kept_microbe_data <- as.matrix(column_to_rownames(kept_microbe_data, "FISH"))
-  #removes the $FISH column and makes it the row names instead 
-  #this is all numbers now, so it's a much lighter matrix
-  
-  View(kept_microbe_data)
-  
-  kept_microbe_data_relative <- decostand(kept_microbe_data, "total")
-  #makes each read count relative to the total number of reads for that seahorse
-  
-  View(kept_microbe_data_relative)
-  
-  View(supertype_df)
-  
-  JLA_supertypes_matrix <- matrix(row.names = fish_names,
-         kept_microbe_data[JLA_supertypes])
-  
-  View(JLA_supertypes_matrix)
-  
-  
-  absolute_microbe_supertype_glm <- glm()
-  
-  
+  get_microbe_supertype_analysis(read.csv(paste0(pipeline_phasepath, "GLMOTUSTv2.csv")), 
+                                 supertype_df)
   
   
 }
