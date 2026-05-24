@@ -301,12 +301,12 @@ get_supertypes <- function(final_dapc){
   
 }
 
-get_glm_analyses <- function(sm_data, kept_microbe_names, supertypes) {
+get_glm_analyses <- function(sm_data, kept_microbe_names, used_supertypes) {
   
   cat("\nCalculating GLM... This may take a moment...\n\n")
   
   supertype_microbe_combos <- expand.grid(Microbe = kept_microbe_names,
-                                          Supertype = supertypes,
+                                          Supertype = used_supertypes,
                                           stringsAsFactors = FALSE)
   
   #all SupertypeMicrobe combinations for GLM analyses
@@ -317,9 +317,10 @@ get_glm_analyses <- function(sm_data, kept_microbe_names, supertypes) {
     supertype <- unname(supertype_microbe["Supertype"])
     microbe   <- unname(supertype_microbe["Microbe"])
     
-    glm_analysis <- coef(summary(glm(sm_data[, supertype] ~ sm_data[, microbe], 
-               family = quasibinomial(link = "logit"))))
+    glm_analysis <- suppressWarnings(coef(summary(glm(sm_data[, supertype] ~ sm_data[, microbe], 
+               family = quasibinomial(link = "logit")))))
     
+    #the actual GLM analysis for each association
     
     data.frame(
       SUPERTYPE_MICROBE = paste0(supertype, microbe), 
@@ -344,29 +345,23 @@ get_glm_analyses <- function(sm_data, kept_microbe_names, supertypes) {
 
 
 
-get_microbe_supertype_analysis <- function(microbe_supertype_data, supertype_df){
-  
-  #reads per microbe for individual seahorse, whose supertypes can be accessed with the previous dataframe
-  
-  analyzed_supertypes_df <- supertype_df[supertype_df$INDIVIDUAL %in% microbe_supertype_data$FISH, ]
-  #get rows of supertype_df with the same seahorse that are in the microbe_supertype_data 
-  #has their supertypes, so can compare with JLA's 
+get_microbe_supertype_analysis <- function(pipeline_phasepath, microbe_supertype_data){
   
   kept_microbe_names <- grep(x = colnames(microbe_supertype_data), pattern = "^M",value=TRUE)
   #will be the same names as the relative data
   
-  JLA_supertypes <- grep(x = colnames(microbe_supertype_data), pattern = "^S",value=TRUE)
+  used_supertypes <- grep(x = colnames(microbe_supertype_data), pattern = "^S",value=TRUE)
   #supertypes (from JLA's DAPC analysis) associated with each seahorse 
   
-  kept_microbe_data <- microbe_supertype_data[, !(colnames(microbe_supertype_data) %in% JLA_supertypes)]
+  kept_microbe_data <- microbe_supertype_data[, !(colnames(microbe_supertype_data) %in% used_supertypes)]
   #removes supertype values from rows, so can get count of microbe values to keep
   
-  JLA_supertypes_data <- apply(microbe_supertype_data[, JLA_supertypes], 1, function(x){sub("^S", "", names(x)[as.logical(x)])})
+  used_supertypes_data <- apply(microbe_supertype_data[, used_supertypes], 1, function(x){sub("^S", "", names(x)[as.logical(x)])})
   #subsets the part of the microbe data that involves supertypes
   #gets the name of each supertype with a 1 (logical mask) by individual seahorse name (row)
   
-  JLA_supertypes_df <- data.frame(INDIVIDUAL = rep(microbe_supertype_data$FISH, times=lengths(JLA_supertypes_data)),
-                                  SUPERTYPE = as.numeric(unlist(JLA_supertypes_data)))
+  used_supertypes_df <- data.frame(INDIVIDUAL = rep(microbe_supertype_data$FISH, times=lengths(used_supertypes_data)),
+                                  SUPERTYPE = as.numeric(unlist(used_supertypes_data)))
   
   #gets the supertype numbers for each seahorse and puts them into a dataframe
   
@@ -380,23 +375,51 @@ get_microbe_supertype_analysis <- function(microbe_supertype_data, supertype_df)
   #this is all numbers now, so it's a much lighter matrix
   
   kept_microbe_data_relative <- decostand(kept_microbe_data, "total")
-  kept_microbe_data_relative <- cbind(kept_microbe_data_relative, microbe_supertype_data[, JLA_supertypes])
+  kept_microbe_data_relative <- cbind(kept_microbe_data_relative, microbe_supertype_data[, used_supertypes])
 
   #makes each read count relative to the total number of reads for that seahorse
   #bind back the supertype data for GLM analyses
 
-  absolute_microbe_supertype_glm_df <- get_glm_analyses(microbe_supertype_data, colnames(kept_microbe_data), JLA_supertypes)
+  absolute_microbe_supertype_glm_df <- get_glm_analyses(microbe_supertype_data, colnames(kept_microbe_data), used_supertypes)
   
   #run GLM on absolute values for microbe_supertype counts
-  
-  relative_microbe_supertype_glm_df <- get_glm_analyses(microbe_supertype_data, colnames(kept_microbe_data_relative), JLA_supertypes)
-  
-  #run GLM on relative values for microbe_supertype counts
+  #exact same results for the relative data
   
   View(absolute_microbe_supertype_glm_df)
-  View(relative_microbe_supertype_glm_df)
   
-  #Graph $WALDZ a heatmap!
+  heatmap_microbes <- names(sort(colSums(kept_microbe_data, na.rm = TRUE), decreasing = TRUE))[1:32]
+  
+  heatmap_df <- absolute_microbe_supertype_glm_df[absolute_microbe_supertype_glm_df$MICROBE %in% heatmap_microbes, ]
+  #of the microbes which appeared at least 100 times, these are the top 32 most prevalent ones
+  #gets most relevant data and also makes heatmap more readable
+  
+  min_z <- min(heatmap_df$WALDZ, na.rm = TRUE)
+  max_z <- max(heatmap_df$WALDZ, na.rm = TRUE)
+  mid_z <- (min_z + max_z)/2
+  
+  sm_heatmap <- ggplot(heatmap_df, aes(x = SUPERTYPE, y = MICROBE, fill = WALDZ)) +
+      geom_tile(color = "black") +
+      scale_fill_gradient2(
+        low = "blue", mid="hotpink", high = "red", 
+        midpoint=mid_z,
+        limits = c(min_z, max_z),
+        breaks = c(min_z, max_z),
+        labels = ceiling(c(min_z, max_z)), 
+        name = "Wald's Z"
+      ) +
+      theme_minimal() +
+      theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 8)
+      ) +
+      labs(title = "JLA Microbe–Supertype Associations for Microbes Present 99+ Times", x = "Supertype", y = "Microbe")
+  
+  suppressWarnings(ggsave(paste0(pipeline_phasepath, "JLA_Supertype_Microbe_WaldZ_Heatmap.pdf"), 
+         plot = sm_heatmap, 
+         width = 10, 
+         height = 8))
+  
+  #creates heatmap of the Wald's Z for each of JLA's microbe-supertype associations
   
 }
 
@@ -462,8 +485,17 @@ main <- function(ABphasepath, pipeline_phasepath){
   supertype_df <- get_supertypes(final_dapc)
   #gets supertypes of all recombinants and their population
   
-  get_microbe_supertype_analysis(read.csv(paste0(pipeline_phasepath, "GLMOTUSTv2.csv")), 
-                                 supertype_df)
+  microbe_supertype_data <- read.csv(paste0(pipeline_phasepath, "GLMOTUSTv2.csv"))
+  #reads per microbe for individual seahorse, whose supertypes can be accessed with the previous dataframe
+  
+  get_microbe_supertype_analysis(pipeline_phasepath, microbe_supertype_data)
+  #calculates the GLM for each supertype-microbe association 
+  #puts results into dataframes and generates a heatmap
+  
+  analyzed_supertypes_df <- supertype_df[supertype_df$INDIVIDUAL %in% microbe_supertype_data$FISH, ]
+  #get rows of supertype_df with the same seahorse that are in the microbe_supertype_data 
+  #has their supertypes, so can compare with JLA's 
+  
   
   
 }
