@@ -47,11 +47,11 @@ get_recombs <- function(alpha_phasepath, beta_phasepath){
   
 }
 
-remove_recco <- function(recombs, pipeline_phasepath){
+remove_recco <- function(recombs, pipeline_path){
   
-  recco_phasepath <- paste0(pipeline_phasepath, "recco_results.csv")
+  recco_path <- paste0(pipeline_path, "recco_results.csv")
   
-  recco_names <- read.delim(recco_phasepath)$Sequence
+  recco_names <- read.delim(recco_path)$Sequence
   #RECCO's output file is TSV, not CSV like it says
   
   return(recombs[!names(recombs) %in% recco_names])
@@ -125,7 +125,7 @@ get_pos_sel_proteins <- function(recomb_proteins, datamonkey_codons){
   
 }
 
-get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
+get_dapc_analysis <- function(zscores, num_tests, pipeline_path){
   
   #supertype and cluster used interchangeably here
   
@@ -173,7 +173,7 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
   
   cat("\nFinding optimal number of PCs... This may take a moment...\n")
   
-  pdf(paste0(pipeline_phasepath,"A_optimization_graph_MGR.pdf"), width = 10, height = 10)
+  pdf(paste0(pipeline_path,"A_optimization_graph_MGR.pdf"), width = 10, height = 10)
 
   a_spline_data <- optim.a.score(test_dapc, n.sim=1000)
   #finds the optimal number of principal components
@@ -219,7 +219,7 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
       
       guides(color = guide_legend(ncol = 1, reverse = TRUE)))
   
-  ggsave(paste0(pipeline_phasepath, "Recombinant_by_Supertype_Graph.pdf"), 
+  ggsave(paste0(pipeline_path, "Recombinant_by_Supertype_Graph.pdf"), 
          plot = recomb_by_supertype_graph, 
          width = 0.111*nrow(indv_by_supertype_df), 
          height = 1.1 * nlevels(indv_by_supertype_df$Supertype), 
@@ -235,7 +235,7 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
   
   all_pairs <- combn(da_columns, 2) 
   
-  pdf(paste0(pipeline_phasepath,"Recombinant_by_Supertype_Atlas.pdf"), width = 12, height = 10)
+  pdf(paste0(pipeline_path,"Recombinant_by_Supertype_Atlas.pdf"), width = 12, height = 10)
   
   ind_coords <- data.frame(final_dapc$ind.coord, 
                            Cluster = as.factor(final_dapc$assign))
@@ -357,7 +357,7 @@ get_glm_analyses <- function(sm_data, kept_microbe_names, used_supertypes) {
   
 }                       
 
-get_waldz_heatmap <- function(pipeline_phasepath, kept_microbe_data, glm_df, num_microbes, heatmap_title, heatmap_file_name){
+get_waldz_heatmap <- function(pipeline_path, kept_microbe_data, glm_df, num_microbes, heatmap_title, heatmap_file_name){
   
   heatmap_microbes <- names(sort(colSums(kept_microbe_data, na.rm = TRUE), decreasing = TRUE))[1:num_microbes]
   
@@ -389,7 +389,7 @@ get_waldz_heatmap <- function(pipeline_phasepath, kept_microbe_data, glm_df, num
     ) +
     labs(title = heatmap_title, x = "Supertype", y = "Microbe")
   
-  suppressWarnings(ggsave(paste0(pipeline_phasepath, heatmap_file_name, ".pdf"), 
+  suppressWarnings(ggsave(paste0(pipeline_path, heatmap_file_name, ".pdf"), 
                           plot = sm_heatmap, 
                           width = 10, 
                           height = 8))
@@ -401,7 +401,7 @@ get_waldz_heatmap <- function(pipeline_phasepath, kept_microbe_data, glm_df, num
 }
 
 
-get_microbe_supertype_analysis <- function(pipeline_phasepath, microbe_supertype_data, num_microbes, heatmap_title, heatmap_file_name, GLM_data_csv_file_name){
+get_microbe_supertype_analysis <- function(pipeline_path, microbe_supertype_data, num_microbes, heatmap_title, heatmap_file_name, GLM_data_csv_file_name){
   
   kept_microbe_names <- grep(x = colnames(microbe_supertype_data), pattern = "^M",value=TRUE)
   #will be the same names as the relative data
@@ -443,10 +443,10 @@ get_microbe_supertype_analysis <- function(pipeline_phasepath, microbe_supertype
   #run GLM on absolute values for microbe_supertype counts
   #exact same results for the relative data
   
-  write.csv(absolute_microbe_supertype_glm_df, paste0(pipeline_phasepath, GLM_data_csv_file_name, ".csv"))
+  write.csv(absolute_microbe_supertype_glm_df, paste0(pipeline_path, GLM_data_csv_file_name, ".csv"))
   #saves GLM results as a CSV file
   
-  get_waldz_heatmap(pipeline_phasepath, 
+  get_waldz_heatmap(pipeline_path, 
                     kept_microbe_data, 
                     absolute_microbe_supertype_glm_df, 
                     32, 
@@ -488,7 +488,7 @@ get_my_microbe_supertype_data <- function(analyzed_supertypes_df, microbe_supert
   
 }
 
-main_alleles_to_supertypes <- function(ABphasepath, pipeline_phasepath){
+main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   #with good alleles, make recombinants (a1b1, a1b2, etc)
   #get FASTA DNA sequences of alleles from PHASED alleles
@@ -499,23 +499,23 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_phasepath){
   
   recombs <- suppressWarnings(get_recombs(alpha_phasepath, beta_phasepath))
   
-  if(!dir.exists(pipeline_phasepath)) {
-    dir.create(pipeline_phasepath)
+  if(!dir.exists(pipeline_path)) {
+    dir.create(pipeline_path)
   }
   #creates Pipeline folder
   
   write.fasta(as.list(recombs), 
               names(recombs), 
-              file.out=paste0(pipeline_phasepath, "recombs.fasta"))
+              file.out=paste0(pipeline_path, "recombs.fasta"))
   #FASTA file of recombs
   
   #run RECCO analyses on recombinants
   
-  recombs <- suppressWarnings(remove_recco(recombs, pipeline_phasepath))
+  recombs <- suppressWarnings(remove_recco(recombs, pipeline_path))
   
   write.fasta(as.list(recombs), 
               names(recombs), 
-              file.out=paste0(pipeline_phasepath, "recombs_postRECCO.fasta"))
+              file.out=paste0(pipeline_path, "recombs_postRECCO.fasta"))
   
   #send post-RECCO alleles to DataMonkey
   
@@ -526,14 +526,14 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_phasepath){
   
   write.fasta(as.list(recombs), 
               names(recombs), 
-              file.out=paste0(pipeline_phasepath, "recombs_postRECCO.fasta"))
+              file.out=paste0(pipeline_path, "recombs_postRECCO.fasta"))
   
   #overwrite the post-RECCO recombs file with recombs which do not produce a *
   #send these to DataMonkey
   
-  datamonkey_codons <- get_datamonkey(paste0(pipeline_phasepath, "slac.csv"), 
-                                      paste0(pipeline_phasepath, "meme.json"), 
-                                      paste0(pipeline_phasepath, "fel.json"))
+  datamonkey_codons <- get_datamonkey(paste0(pipeline_path, "slac.csv"), 
+                                      paste0(pipeline_path, "meme.json"), 
+                                      paste0(pipeline_path, "fel.json"))
   
   #get positions of amino acids under positive selection in sampled pops
   
@@ -543,17 +543,17 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_phasepath){
   zscores <- get_z_scores(recomb_proteins_pos_sel)
   #makes Z-scores of each immune amino acid into a data frame
   
-  final_dapc <- get_dapc_analysis(zscores, 250, pipeline_phasepath)
+  final_dapc <- get_dapc_analysis(zscores, 250, pipeline_path)
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
   analyzed_supertypes_df <- get_supertypes(final_dapc)
   #gets supertypes of all recombinants and their population
   
-  microbe_supertype_data <- read.csv(paste0(pipeline_phasepath, "GLMOTUSTv2.csv"))
+  microbe_supertype_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
   #reads per microbe for individual seahorse, whose supertypes can be accessed with the previous dataframe
   
-  kept_microbe_data <- get_microbe_supertype_analysis(pipeline_phasepath, 
+  kept_microbe_data <- get_microbe_supertype_analysis(pipeline_path, 
                                  microbe_supertype_data, 
                                  32, 
                                  "JLA Microbe–Supertype Associations for Microbes Present 99+ Times", 
@@ -564,7 +564,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_phasepath){
   
   microbe_supertype_data <- get_my_microbe_supertype_data(analyzed_supertypes_df, microbe_supertype_data, kept_microbe_data)
   
-  kept_microbe_data <- get_microbe_supertype_analysis(pipeline_phasepath, 
+  kept_microbe_data <- get_microbe_supertype_analysis(pipeline_path, 
                                  microbe_supertype_data, 
                                  32, 
                                  "MGR Microbe–Supertype Associations for Microbes Present 99+ Times", 
