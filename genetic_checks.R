@@ -1,4 +1,4 @@
-
+library("seqinr")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
@@ -16,19 +16,29 @@ analyze_out <- function(outpath){
   #get length of allele
   #get dataframe (as CSV) of confidences at each loci
   
-  allele_lines <- outfile[(grep("BEGIN BESTPAIRS_SUMMARY", outfile, value=FALSE)+1):(grep("END BESTPAIRS_SUMMARY", outfile, value=FALSE)-1)]
+  alleles_by_indv <- outfile[(grep("BEGIN BESTPAIRS_SUMMARY", outfile, value=FALSE)+1):(grep("END BESTPAIRS_SUMMARY", outfile, value=FALSE)-1)]
   
-  allele_lines <- strsplit(gsub(":", ",", gsub("\\(|\\)", "", gsub(" ", "", allele_lines))), ",")
+  alleles_by_indv <- strsplit(gsub(":", ",", gsub("\\(|\\)", "", gsub(" ", "", alleles_by_indv))), ",")
+  #[1] is name, [2] is allele1 number, [3] is allele2 number
+  
+  alleles_by_freq <- outfile[(grep("BEGIN LIST_SUMMARY", outfile, value=FALSE)+1):(grep("END LIST_SUMMARY", outfile, value=FALSE)-1)]
+  
+  allele_freqs <- as.numeric(sub(".*\\s+([0-9]+\\.[0-9]+)\\s*$", "\\1", alleles_by_freq))
+  allele_numbers <- as.integer(sub("^\\s*([0-9]+)\\s+.*", "\\1", alleles_by_freq))
+  
+  print(allele_numbers)
+  
+  phased_allele_seqs <- suppressWarnings(toupper(read.fasta(sub("seqphase.out", "phased.fasta", outpath), as.string=TRUE)))
+  #get allelic sequences
+  
+  #print(phased_alleles)
+  
+  allele_lengths <- nchar(phased_allele_seqs)
+  
+  #where says "positions of loci," get the loci positions
   
   
-  
-  print(allele_lines)
-  
-  
-  
-  
-  
-  View(allelic_info)
+  #View(allelic_info)
   
   
   
@@ -38,6 +48,11 @@ analyze_out <- function(outpath){
   #get number of unique alleles in outfile
   #get p value used
   
+  #"number of individuals"
+  #"number of loci"
+  #begin command line --> -p0.5
+  #get number of probabilities below some threshold, name column "P>[threshold]" 
+  #length(unique(allele_seqs))
   
   #return both as list, get [1] then [2] from it
   
