@@ -22,26 +22,26 @@ get_recombs <- function(alpha_phasepath, beta_phasepath){
   alpha_seqs <- read.fasta(alpha_phasepath, as.string = TRUE)
   beta_seqs <- read.fasta(beta_phasepath, as.string = TRUE)
   
-  if(sum(names(alpha_seqs) != names(beta_seqs)) == 0){cat("Good to go!\n")}
+  if(sum(names(alpha_seqs) != names(beta_seqs)) == 0){cat("The alpha and beta alleles are a 1:1 match! The pipeline is good to go!\n\n")}
   #all sequence names are the same 
   
-  names <- unique(gsub("[ab]$", "", names(alpha_seqs)))
+  indv_names <- unique(gsub("[ab]$", "", names(alpha_seqs)))
   #get names of individuals whose sequences you're looking at
   
-  a1b1 <- toupper(paste0(alpha_seqs[paste0(names, "a")], substr(beta_seqs[paste0(names, "a")], 3, 272)))
+  a1b1 <- toupper(paste0(alpha_seqs[paste0(indv_names, "a")], substr(beta_seqs[paste0(indv_names, "a")], 3, 272)))
   #a = 1st allele, b = 2nd allele, per individual
   #the snipped betas have 2 extra bps ahead and 1 extra bp behind, so cut them out
   #trims to functional reading frames
-  a1b2 <- toupper(paste0(alpha_seqs[paste0(names, "a")], substr(beta_seqs[paste0(names, "b")], 3, 272)))
-  a2b1 <- toupper(paste0(alpha_seqs[paste0(names, "b")], substr(beta_seqs[paste0(names, "a")], 3, 272)))
-  a2b2 <- toupper(paste0(alpha_seqs[paste0(names, "b")], substr(beta_seqs[paste0(names, "b")], 3, 272)))
+  a1b2 <- toupper(paste0(alpha_seqs[paste0(indv_names, "a")], substr(beta_seqs[paste0(indv_names, "b")], 3, 272)))
+  a2b1 <- toupper(paste0(alpha_seqs[paste0(indv_names, "b")], substr(beta_seqs[paste0(indv_names, "a")], 3, 272)))
+  a2b2 <- toupper(paste0(alpha_seqs[paste0(indv_names, "b")], substr(beta_seqs[paste0(indv_names, "b")], 3, 272)))
   
   return(c(
     
-    setNames(a1b1, paste0(names, "_a1b1")),
-    setNames(a1b2, paste0(names, "_a1b2")),
-    setNames(a2b1, paste0(names, "_a2b1")),
-    setNames(a2b2, paste0(names, "_a2b2"))
+    setNames(a1b1, paste0(indv_names, "_a1b1")),
+    setNames(a1b2, paste0(indv_names, "_a1b2")),
+    setNames(a2b1, paste0(indv_names, "_a2b1")),
+    setNames(a2b2, paste0(indv_names, "_a2b2"))
     
   ))
   
@@ -140,13 +140,10 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
   
   cluster_estimates_table <- table(cluster_estimates)
   
-  cluster_mode <- mean(c(as.numeric(names(cluster_estimates_table[cluster_estimates_table >= max(cluster_estimates_table)]))))
+  cluster_mode <- mean(c(as.numeric(names(cluster_estimates_table[cluster_estimates_table == max(cluster_estimates_table)]))))
+  #gets mode of cluster estimates; automatically rounds down if the mode is a decimal
   
-  cat("\n")
-  cat("Mode Cluster Estimate: ", cluster_mode, "\n")
-  
-  #gets mode of the cluster estimates
-  
+  cat("\nMode Cluster Estimate: ", cluster_mode, "\n")
   cat("Median Cluster Estimate: ", median(cluster_estimates), "\n")
   cat("Average Cluster Estimate: ", mean(cluster_estimates), "\n")
   cat("Range Cluster Estimate: ", diff(range(cluster_estimates)), "\n")
@@ -174,11 +171,14 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
   #n.da maxes out at n.pca-1, finds the maximum number of axes for the cluster comparisons; 
   #setting n.da too high will cause it to self-correct to the maximum possible value
   
-  cat("\n")
-  cat("Finding optimal number of PCs... This may take a moment...\n")
+  cat("\nFinding optimal number of PCs... This may take a moment...\n")
+  
+  pdf(paste0(pipeline_phasepath,"A_optimization_graph_MGR.pdf"), width = 10, height = 10)
 
-  a_spline_data <- optim.a.score(test_dapc, n.sim=10)
+  a_spline_data <- optim.a.score(test_dapc, n.sim=1000)
   #finds the optimal number of principal components
+  
+  dev.off()
   
   final_dapc <- dapc(zscores, 
                      grp = cluster_data$grp, 
@@ -189,8 +189,7 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
   #DAPC can now get the best analysis of the recombinants using only the optimized number of PCs
   #it looks at the top n.pca separations and keeps those, while the rest are deleted
   
-  cat("\n")
-  cat(final_dapc$var * 100, "% of Variance explained using ", final_dapc$n.pca, " PCs and ", length(final_dapc$eig), "/", length(final_dapc$pca.eig), " eigenvalues")
+  cat("\n", final_dapc$var * 100, "% of Variance explained using ", final_dapc$n.pca, " PCs and ", length(final_dapc$eig), "/", length(final_dapc$pca.eig), " eigenvalues")
   #how much variance is captured by the optimal number of PCs, 
   #and how many eigenvalues were possible
   
@@ -280,7 +279,7 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_phasepath){
   
   dev.off() 
   
-  cat("Atlas Complete!\n")
+  cat("\nAtlas Complete!\n")
   
   #this gets all of the linear discriminants and plots them against each other in a multi-page plot 
   #helps visualize X-dimensional space, where X is the number of LDs
@@ -303,7 +302,7 @@ get_supertypes <- function(final_dapc){
 
 get_glm_analyses <- function(sm_data, kept_microbe_names, used_supertypes) {
   
-  cat("\nCalculating GLM... This may take a moment...\n\n")
+  cat("\nCalculating GLM... This may take a moment...\n")
   
   supertype_microbe_combos <- expand.grid(Microbe = kept_microbe_names,
                                           Supertype = used_supertypes,
@@ -329,6 +328,7 @@ get_glm_analyses <- function(sm_data, kept_microbe_names, used_supertypes) {
       SLOPE = glm_analysis[2], 
       SE = glm_analysis[4], 
       WALDZ = (glm_analysis[2] / glm_analysis[4]),
+      p=glm_analysis[8],
       stringsAsFactors = FALSE
     )
   })
@@ -337,15 +337,71 @@ get_glm_analyses <- function(sm_data, kept_microbe_names, used_supertypes) {
   #run GLM analysis between all supertypes and microbes 
   #(accessing parts of expand.grid is faster than nested for loops)
   
-  return(do.call(rbind, GLMresults))
-  #return all GLM analyses info bound into dataframe
+  final_glm_df <- do.call(rbind, GLMresults)
+  #all GLM analyses info bound into dataframe
+  
+  final_glm_df$SEQ_BONFERRONI_p <- p.adjust(final_glm_df$p, method = "holm")
+  #Sequential Bonferroni correction (Holm-Bonferroni) along the entire dataframe
+  
+  final_glm_df$SIGNIFICANCE <- as.character(symnum(final_glm_df$SEQ_BONFERRONI_p, 
+                                      corr = FALSE, 
+                                      na = FALSE, 
+                                      cutpoints = c(0, 0.001, 0.01, 0.05, 1), 
+                                      symbols = c("***", "**", "*", "")))
+  
+  #stars based on the significance of the Bonferroni-corrected association
+  #doesnt try to reformat associations, just does 1:1 significance:symbol mapping
+  #if there's an NA, prints "" insteas of R's default "?"
+  
+  return(final_glm_df)
   
 }                       
 
+get_waldz_heatmap <- function(pipeline_phasepath, kept_microbe_data, glm_df, num_microbes, heatmap_title, heatmap_file_name){
+  
+  heatmap_microbes <- names(sort(colSums(kept_microbe_data, na.rm = TRUE), decreasing = TRUE))[1:num_microbes]
+  
+  heatmap_df <- glm_df[glm_df$MICROBE %in% heatmap_microbes, ]
+  #of the microbes which appeared at least 100 times, these are the top 32 most prevalent ones
+  #gets most relevant data and also makes heatmap more readable
+  
+  min_z <- min(heatmap_df$WALDZ, na.rm = TRUE)
+  max_z <- max(heatmap_df$WALDZ, na.rm = TRUE)
+  mid_z <- (min_z + max_z)/2
+  
+  sm_heatmap <- ggplot(heatmap_df, aes(x = SUPERTYPE, y = MICROBE, fill = WALDZ)) +
+    geom_tile(color = "black") +
+    geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 5, vjust = 0.7)  +
+    scale_color_manual(values = c("TRUE" = "white", "FALSE" = "black"), guide = "none") +
+    scale_fill_gradient2(
+      low = "white", mid="gray", high = "black", 
+      midpoint=mid_z,
+      limits = c(min_z, max_z),
+      breaks = c(min_z, max_z),
+      labels = ceiling(c(min_z, max_z)), 
+      name = "Wald's Z"
+    ) +
+    guides(fill = guide_colorbar(frame.color = "black", frame.linewidth = 0.2)) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.y = element_text(size = 8)
+    ) +
+    labs(title = heatmap_title, x = "Supertype", y = "Microbe")
+  
+  suppressWarnings(ggsave(paste0(pipeline_phasepath, heatmap_file_name, ".pdf"), 
+                          plot = sm_heatmap, 
+                          width = 10, 
+                          height = 8))
+  
+  #creates heatmap of the Wald's Z for each microbe-supertype association
+  #prints stars based on the significance of each sequentially-Bonferroni-corrected association
+  
+  
+}
 
 
-
-get_microbe_supertype_analysis <- function(pipeline_phasepath, microbe_supertype_data){
+get_microbe_supertype_analysis <- function(pipeline_phasepath, microbe_supertype_data, num_microbes, heatmap_title, heatmap_file_name, GLM_data_csv_file_name){
   
   kept_microbe_names <- grep(x = colnames(microbe_supertype_data), pattern = "^M",value=TRUE)
   #will be the same names as the relative data
@@ -370,8 +426,10 @@ get_microbe_supertype_analysis <- function(pipeline_phasepath, microbe_supertype
   #filter applies to all non-name columns
   #then, selected columns and first column of names are selected 
   
+  rownames(kept_microbe_data) <- NULL
   kept_microbe_data <- as.matrix(column_to_rownames(kept_microbe_data, "FISH"))
   #removes the $FISH column and makes it the row names instead 
+  #also gets rid of real rownames to prevent overriding issues
   #this is all numbers now, so it's a much lighter matrix
   
   kept_microbe_data_relative <- decostand(kept_microbe_data, "total")
@@ -385,45 +443,52 @@ get_microbe_supertype_analysis <- function(pipeline_phasepath, microbe_supertype
   #run GLM on absolute values for microbe_supertype counts
   #exact same results for the relative data
   
-  View(absolute_microbe_supertype_glm_df)
+  write.csv(absolute_microbe_supertype_glm_df, paste0(pipeline_phasepath, GLM_data_csv_file_name, ".csv"))
+  #saves GLM results as a CSV file
   
-  heatmap_microbes <- names(sort(colSums(kept_microbe_data, na.rm = TRUE), decreasing = TRUE))[1:32]
+  get_waldz_heatmap(pipeline_phasepath, 
+                    kept_microbe_data, 
+                    absolute_microbe_supertype_glm_df, 
+                    32, 
+                    heatmap_title, 
+                    heatmap_file_name)
   
-  heatmap_df <- absolute_microbe_supertype_glm_df[absolute_microbe_supertype_glm_df$MICROBE %in% heatmap_microbes, ]
-  #of the microbes which appeared at least 100 times, these are the top 32 most prevalent ones
-  #gets most relevant data and also makes heatmap more readable
+  return(kept_microbe_data)
   
-  min_z <- min(heatmap_df$WALDZ, na.rm = TRUE)
-  max_z <- max(heatmap_df$WALDZ, na.rm = TRUE)
-  mid_z <- (min_z + max_z)/2
-  
-  sm_heatmap <- ggplot(heatmap_df, aes(x = SUPERTYPE, y = MICROBE, fill = WALDZ)) +
-      geom_tile(color = "black") +
-      scale_fill_gradient2(
-        low = "blue", mid="hotpink", high = "red", 
-        midpoint=mid_z,
-        limits = c(min_z, max_z),
-        breaks = c(min_z, max_z),
-        labels = ceiling(c(min_z, max_z)), 
-        name = "Wald's Z"
-      ) +
-      theme_minimal() +
-      theme(
-        axis.text.x = element_text(angle = 45, hjust = 1),
-        axis.text.y = element_text(size = 8)
-      ) +
-      labs(title = "JLA Microbe–Supertype Associations for Microbes Present 99+ Times", x = "Supertype", y = "Microbe")
-  
-  suppressWarnings(ggsave(paste0(pipeline_phasepath, "JLA_Supertype_Microbe_WaldZ_Heatmap.pdf"), 
-         plot = sm_heatmap, 
-         width = 10, 
-         height = 8))
-  
-  #creates heatmap of the Wald's Z for each of JLA's microbe-supertype associations
+  #creates heatmap for each microbe-supertype association
   
 }
 
-main <- function(ABphasepath, pipeline_phasepath){
+get_my_microbe_supertype_data <- function(analyzed_supertypes_df, microbe_supertype_data, kept_microbe_data){
+  
+  analyzed_supertypes_df <- analyzed_supertypes_df[analyzed_supertypes_df$INDIVIDUAL %in% microbe_supertype_data$FISH, ]
+  #gets the supertypes from my DAPC analysis for the same individuals used in JLA's analysis
+  #can compare supertypes for the same individuals 
+  
+  analyzed_supertype_matrix <- +(table(analyzed_supertypes_df) > 0)
+  #creates a logical matrix where supertypes present at least once for individuals get 1s and the rest get 0's
+  
+  analyzed_supertype_matrix <- analyzed_supertype_matrix[, colSums(analyzed_supertype_matrix) > 0, drop=FALSE]
+  #if no individual has a supertype, exclude that supertype from the matrix; keep 2D
+  
+  colnames(analyzed_supertype_matrix) <- sprintf("S%02d", as.numeric(colnames(analyzed_supertype_matrix)))  
+  #renames supertype number to Snumber instead; 1 becomes S1, etc
+  #also pads the 2 digits with 0's, as to order supertype numbers correctly on the heatmap
+  
+  microbe_supertype_data <- data.frame(
+    FISH = rownames(kept_microbe_data),
+    as.data.frame(kept_microbe_data),
+    as.data.frame(analyzed_supertype_matrix),
+    stringsAsFactors = FALSE
+  )
+  #binds the supertype matrix and microbe counts together, just with my supertype boolean rows instead of JLA's
+  #also keeps the $FISH column name, since JLA had it and since it's integrated into the pipeline
+  
+  return(microbe_supertype_data)
+  
+}
+
+main_alleles_to_supertypes <- function(ABphasepath, pipeline_phasepath){
   
   #with good alleles, make recombinants (a1b1, a1b2, etc)
   #get FASTA DNA sequences of alleles from PHASED alleles
@@ -478,28 +543,36 @@ main <- function(ABphasepath, pipeline_phasepath){
   zscores <- get_z_scores(recomb_proteins_pos_sel)
   #makes Z-scores of each immune amino acid into a data frame
   
-  final_dapc <- get_dapc_analysis(zscores, 1, pipeline_phasepath)
+  final_dapc <- get_dapc_analysis(zscores, 250, pipeline_phasepath)
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
-  supertype_df <- get_supertypes(final_dapc)
+  analyzed_supertypes_df <- get_supertypes(final_dapc)
   #gets supertypes of all recombinants and their population
   
   microbe_supertype_data <- read.csv(paste0(pipeline_phasepath, "GLMOTUSTv2.csv"))
   #reads per microbe for individual seahorse, whose supertypes can be accessed with the previous dataframe
   
-  get_microbe_supertype_analysis(pipeline_phasepath, microbe_supertype_data)
+  kept_microbe_data <- get_microbe_supertype_analysis(pipeline_phasepath, 
+                                 microbe_supertype_data, 
+                                 32, 
+                                 "JLA Microbe–Supertype Associations for Microbes Present 99+ Times", 
+                                 "JLA_Supertype_Microbe_WaldZ_Heatmap",
+                                 "JLA_GLM_analysis_data")
   #calculates the GLM for each supertype-microbe association 
   #puts results into dataframes and generates a heatmap
   
-  analyzed_supertypes_df <- supertype_df[supertype_df$INDIVIDUAL %in% microbe_supertype_data$FISH, ]
-  #get rows of supertype_df with the same seahorse that are in the microbe_supertype_data 
-  #has their supertypes, so can compare with JLA's 
+  microbe_supertype_data <- get_my_microbe_supertype_data(analyzed_supertypes_df, microbe_supertype_data, kept_microbe_data)
   
-  
+  kept_microbe_data <- get_microbe_supertype_analysis(pipeline_phasepath, 
+                                 microbe_supertype_data, 
+                                 32, 
+                                 "MGR Microbe–Supertype Associations for Microbes Present 99+ Times", 
+                                 "MGR_Supertype_Microbe_WaldZ_Heatmap",
+                                 "MGR_GLM_analysis_data")
   
 }
 
-main("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/", "Pipeline/")
+main_alleles_to_supertypes("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/", "Pipeline/")
 
 
