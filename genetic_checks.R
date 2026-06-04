@@ -4,7 +4,7 @@ library("waldo")
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
 analyze_out <- function(outpath, pipeline_path, p){
-  
+    
   outfile <- readLines(outpath)
   
   type_seq <- sub(".*PHASE_([AB]+).*", "\\1", outpath)
@@ -70,7 +70,7 @@ analyze_out <- function(outpath, pipeline_path, p){
   
   #View(input_alleles_data)
   
-  #write.csv(input_alleles_data, paste0(pipeline_path, "input_", type_seq, "_alleles_data.csv"))
+  write.csv(input_alleles_data, paste0(pipeline_path, "input_", type_seq, "_alleles_data.csv"))
   
   phased_allele_seqs <- suppressWarnings(toupper(read.fasta(sub("seqphase.out", "phased.fasta", outpath), as.string=TRUE)))
   #get allelic sequences
@@ -93,7 +93,7 @@ analyze_out <- function(outpath, pipeline_path, p){
     
   )
   
-  #View(phased_allele_data)
+  View(phased_allele_data)
   
   #write.csv(phased_allele_data, paste0(pipeline_path, "phased_", type_seq, "_alleles_data.csv"))
   
@@ -143,40 +143,43 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
   
   type_seq <- sub(".*PHASE_([AB]+).*", "\\1", phased_alleles_path)
 
+  AB_sequences <- suppressWarnings(toupper(read.fasta(gsub("phased", "unphased", phased_alleles_path), as.string = TRUE)))
   
-  AB_sequences <- suppressWarnings(read.fasta(phased_alleles_path, as.string = TRUE))
-  
-  
-  AB_alphas <- toupper(substr(AB_sequences, 1, 246))
-  AB_betas <- toupper(substr(AB_sequences, 247, 519))
+  AB_alleles <- suppressWarnings(read.fasta(phased_alleles_path, as.string = TRUE))
+
+  AB_alphas <- toupper(substr(AB_alleles, 1, 246))
+  AB_betas <- toupper(substr(AB_alleles, 247, 519))
   
   AB_recombs <- get_recombs(AB_alphas, AB_betas)
-    
-  alphabeta_alphas <- suppressWarnings(toupper(read.fasta(sub("(.*PHASE_)AB", "\\1A", phased_alleles_path), as.string = TRUE)))
   
-  alphabeta_betas <- suppressWarnings(toupper(read.fasta(sub("(.*PHASE_)AB", "\\1B", phased_alleles_path), as.string = TRUE)))
+  alpha_alleles_path <- sub("(.*PHASE_)AB", "\\1A", phased_alleles_path)
+  beta_alleles_path <- sub("(.*PHASE_)AB", "\\1B", phased_alleles_path)
   
-  AlphaBeta_recombs <- get_recombs(alphabeta_alphas, alphabeta_betas)
+  alphas <- suppressWarnings(toupper(read.fasta(alpha_alleles_path, as.string = TRUE)))
   
-  individuals <- sub("b$", "", sub("a$", "", names(AB_sequences)))
+  betas <- suppressWarnings(toupper(read.fasta(beta_alleles_path, as.string = TRUE)))
+  
+  alphabeta_recombs <- get_recombs(alphas, betas)
+  
+  individuals <- sub("[ab]$", "", names(AB_alleles))
   
   allele_comparisons_df <- data.frame(
     
     INDIVIDUAL = individuals,
     AB_ALPHAS = AB_alphas,
-    ALPHAS = alphabeta_alphas,
+    ALPHAS = alphas,
     AB_BETAS = AB_betas,
-    BETAS = alphabeta_betas
+    BETAS = betas
     
   )
   
-  #View(allele_comparisons_df)
+  View(allele_comparisons_df)
   
   unique_individuals <- unique(individuals)
   
   cat("\nAlpha comparisons:\n")
   
-  compare_seqs <- function(indv, ab_col, a_b_col){
+  compare_alleles <- function(indv, ab_col, a_b_col, AB_sequences, A_B_sequences, init_index){
     
     indv_data <- allele_comparisons_df[allele_comparisons_df$INDIVIDUAL == indv, ]
     
@@ -190,6 +193,9 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
       a_b_chars_one <- strsplit(a_b_data, "")[[1]]
       a_b_chars_two <- strsplit(a_b_data, "")[[2]]
       
+      ab_seqs_chars <- strsplit(AB_sequences, "")[[1]]
+      a_b_seqs_chars <- strsplit(A_B_sequences, "")[[1]]
+      
       comparison_one <- which(ab_chars_one != a_b_chars_one)
       comparison_two <- which(ab_chars_one != a_b_chars_two)
       comparison_three <- which(ab_chars_two != a_b_chars_two)
@@ -200,8 +206,8 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
       
       #best_comparison <- list(straight_mismatches, crossed_mismatches)[[which.min(c(length(straight_mismatches), length(crossed_mismatches)))]]
       
-      cat("\nINDV     BP    AB  A_B")
-      cat("\n----------------------\n")
+      cat("\nINDV     BP    AB  A_B  AB_orig A_B_orig")
+      cat("\n----------------------------------------\n")
 
       
       if(length(straight_mismatches) >= length(crossed_mismatches)){
@@ -209,7 +215,8 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
         #comparison two is more parsimonious, use it here
         #hence, comp2 compares A1 with A4 and A2 with A3
         
-        cat(paste(indv, comparison_two, ab_chars_one[comparison_two], a_b_chars_two[comparison_two], sep="    "), sep="\n")
+        cat(paste(indv, comparison_two, ab_chars_one[comparison_two], a_b_chars_two[comparison_two], ab_seqs_chars[comparison_two + init_index], a_b_seqs_chars[comparison_two], sep="    "), sep="\n")
+      
         
         #best_comparison_two <- comparison_four
         
@@ -218,7 +225,10 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
            !identical(ab_chars_one[comparison_two], a_b_chars_one[comparison_four]) | 
            !identical(ab_chars_two[comparison_two], a_b_chars_two[comparison_four])){
           
-          cat(paste(indv, comparison_four, ab_chars_two[comparison_four], a_b_chars_one[comparison_four], sep="    "), sep="\n")
+          cat("/nSNPs likely in the other pair of alleles, here they are:/n")
+          
+          cat(paste(indv, comparison_four, ab_chars_two[comparison_four], a_b_chars_one[comparison_four], ab_seqs_chars[comparison_four + init_index], a_b_seqs_chars[comparison_four], sep="    "), sep="\n")
+          
           
           
         }
@@ -237,7 +247,8 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
         #comparison one is more parsimonious, use it here
         #hence, comp1 compares A1 with A3 and A2 with A4
         
-        cat(paste(indv, comparison_one, ab_chars_one[comparison_one], a_b_chars_one[comparison_one], sep="    "), sep="\n")
+        cat(paste(indv, comparison_one, ab_chars_one[comparison_one], a_b_chars_one[comparison_one], ab_seqs_chars[comparison_one + init_index], a_b_seqs_chars[comparison_one], sep="    "), sep="\n")
+        
         
         #best_comparison_two <- comparison_three
         
@@ -245,7 +256,9 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
            !identical(ab_chars_one[comparison_one], a_b_chars_two[comparison_three]) | 
            !identical(ab_chars_two[comparison_one], a_b_chars_one[comparison_three])){
           
-          cat(paste(indv, comparison_three, ab_chars_two[comparison_three], a_b_chars_two[comparison_three], sep="    "), sep="\n")
+          cat("/nSNPs likely in the other pair of alleles, here they are:/n")
+          
+          cat(paste(indv, comparison_three, ab_chars_two[comparison_three], a_b_chars_two[comparison_three], ab_seqs_chars[comparison_three + init_index], a_b_seqs_chars[comparison_three], sep="    "), sep="\n")
           
           
         }
@@ -263,12 +276,24 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
     
   }
   
-  sapply(unique_individuals, compare_seqs, ab_col = "AB_ALPHAS", a_b_col = "ALPHAS")
+  sapply(unique_individuals, 
+         compare_alleles, 
+         ab_col = "AB_ALPHAS", 
+         a_b_col = "ALPHAS", 
+         AB_sequences = AB_sequences, 
+         A_B_sequences = suppressWarnings(toupper(read.fasta(sub("phased", "unphased", alpha_alleles_path), as.string = TRUE))), 
+         init_index=0)
   
 
   cat("\n\nBeta comparisons:\n\n")
   
-  sapply(unique_individuals, compare_seqs, ab_col = "AB_BETAS", a_b_col = "BETAS")
+  sapply(unique_individuals, 
+         compare_alleles, 
+         ab_col = "AB_BETAS", 
+         a_b_col = "BETAS", 
+         AB_sequences = AB_sequences, 
+         A_B_sequences = suppressWarnings(toupper(read.fasta(sub("phased", "unphased", beta_alleles_path), as.string = TRUE))), 
+         init_index=246)
   
   cat("\n")
   
@@ -290,17 +315,17 @@ main_genetic_checks <- function(phasepath, pipeline_path, p){
   #what JLA did was PHASE AB's together, which loses some diversity due to PHASE pulling the alarm sooner
   
   comparative_out_data <- data.frame(rbind(
-        suppressWarnings(analyze_out(paste0(phasepath, "CP/PHASE_AB/seqphase.out"), pipeline_path, p)),
+        #suppressWarnings(analyze_out(paste0(phasepath, "CP/PHASE_AB/seqphase.out"), pipeline_path, p)),
         suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/NO_CLONES/PHASE_AB_NOCLONES/seqphase.out"), pipeline_path, p)),
         suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/NO_CLONES/PHASE_A_NOCLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/NO_CLONES/PHASE_B_NOCLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/CLONES/PHASE_A_CLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/CLONES/PHASE_B_CLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/NO_CLONES/PHASE_AB_NOCLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/NO_CLONES/PHASE_A_NOCLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/NO_CLONES/PHASE_B_NOCLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/CLONES/PHASE_A_CLONES/seqphase.out"), pipeline_path, p)),
-        suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/CLONES/PHASE_B_CLONES/seqphase.out"), pipeline_path, p))
+        suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/NO_CLONES/PHASE_B_NOCLONES/seqphase.out"), pipeline_path, p))
+        #suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/CLONES/PHASE_A_CLONES/seqphase.out"), pipeline_path, p)),
+        #suppressWarnings(analyze_out(paste0(phasepath, "p=0.5/CLONES/PHASE_B_CLONES/seqphase.out"), pipeline_path, p)),
+        #suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/NO_CLONES/PHASE_AB_NOCLONES/seqphase.out"), pipeline_path, p)),
+        #suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/NO_CLONES/PHASE_A_NOCLONES/seqphase.out"), pipeline_path, p)),
+        #suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/NO_CLONES/PHASE_B_NOCLONES/seqphase.out"), pipeline_path, p)),
+        #suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/CLONES/PHASE_A_CLONES/seqphase.out"), pipeline_path, p)),
+        #suppressWarnings(analyze_out(paste0(phasepath, "p=0.4/CLONES/PHASE_B_CLONES/seqphase.out"), pipeline_path, p))
         
         ))
   
