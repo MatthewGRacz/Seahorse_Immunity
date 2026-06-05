@@ -211,7 +211,7 @@ analyze_diversities <- function(phased_alleles_path, pipeline_path){
 
       
       if(length(straight_mismatches) >= length(crossed_mismatches)){
-        
+         
         #comparison two is more parsimonious, use it here
         #hence, comp2 compares A1 with A4 and A2 with A3
         
