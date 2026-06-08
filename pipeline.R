@@ -8,12 +8,13 @@ library("ggplot2")
 library("jsonlite")
 library("vegan")
 library("tidyverse")
+library("rvest")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
 
 
-get_recombs <- function(alpha_phasepath, beta_phasepath){
+get_A_B_recombs <- function(alpha_phasepath, beta_phasepath){
   
   alpha_phasepath <- paste0(alpha_phasepath, "phased.fasta")
   beta_phasepath <- paste0(beta_phasepath, "phased.fasta")
@@ -44,6 +45,35 @@ get_recombs <- function(alpha_phasepath, beta_phasepath){
     setNames(a2b2, paste0(indv_names, "_a2b2"))
     
   ))
+  
+}
+
+get_AB_recombs <- function(AB_phasepath){
+  
+  AB_phasepath <- paste0(AB_phasepath, "phased.fasta")
+  
+  AB_alleles <- read.fasta(AB_phasepath, as.string = TRUE)
+  
+  indv_names <- unique(gsub("[ab]$", "", names(AB_alleles)))
+  #get names of individuals whose sequences you're looking at
+  
+  a1b1 <- toupper(paste0(substr(AB_alleles[paste0(indv_names, "a")], 1, 246), substr(AB_alleles[paste0(indv_names, "a")], 249, 518)))
+  #a = 1st allele, b = 2nd allele, per individual
+  #the snipped betas have 2 extra bps ahead and 1 extra bp behind, so cut them out
+  #trims to functional reading frames
+  a1b2 <- toupper(paste0(substr(AB_alleles[paste0(indv_names, "a")], 1, 246), substr(AB_alleles[paste0(indv_names, "b")], 249, 518)))
+  a2b1 <- toupper(paste0(substr(AB_alleles[paste0(indv_names, "b")], 1, 246), substr(AB_alleles[paste0(indv_names, "a")], 249, 518)))
+  a2b2 <- toupper(paste0(substr(AB_alleles[paste0(indv_names, "b")], 1, 246), substr(AB_alleles[paste0(indv_names, "b")], 249, 518)))
+  
+  return(c(
+    
+    setNames(a1b1, paste0(indv_names, "_a1b1")),
+    setNames(a1b2, paste0(indv_names, "_a1b2")),
+    setNames(a2b1, paste0(indv_names, "_a2b1")),
+    setNames(a2b2, paste0(indv_names, "_a2b2"))
+    
+  ))
+  
   
 }
 
@@ -472,8 +502,8 @@ get_my_microbe_supertype_data <- function(analyzed_supertypes_df, microbe_supert
   #if no individual has a supertype, exclude that supertype from the matrix; keep 2D
   
   colnames(analyzed_supertype_matrix) <- sprintf("S%02d", as.numeric(colnames(analyzed_supertype_matrix)))  
-  #renames supertype number to Snumber instead; 1 becomes S1, etc
-  #also pads the 2 digits with 0's, as to order supertype numbers correctly on the heatmap
+  #renames supertype number to Snumber instead; pads that number with 0s if under 2 digits --> S01
+  #orders supertype numbers correctly on the heatmap
   
   microbe_supertype_data <- data.frame(
     FISH = rownames(kept_microbe_data),
@@ -490,6 +520,9 @@ get_my_microbe_supertype_data <- function(analyzed_supertypes_df, microbe_supert
 
 main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
+  ABphasepath <- "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/"
+  pipeline_path <- "Pipeline/"
+  
   #with good alleles, make recombinants (a1b1, a1b2, etc)
   #get FASTA DNA sequences of alleles from PHASED alleles
   #Alpha Alleles and Beta Alleles, glue them together
@@ -497,7 +530,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   alpha_phasepath <- gsub("AB", "A", ABphasepath)
   beta_phasepath <- gsub("AB", "B", ABphasepath)
   
-  recombs <- suppressWarnings(get_recombs(alpha_phasepath, beta_phasepath))
+  recombs <- suppressWarnings(get_AB_recombs(ABphasepath))
   
   if(!dir.exists(pipeline_path)) {
     dir.create(pipeline_path)
@@ -543,7 +576,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   zscores <- get_z_scores(recomb_proteins_pos_sel)
   #makes Z-scores of each immune amino acid into a data frame
   
-  final_dapc <- get_dapc_analysis(zscores, 250, pipeline_path)
+  final_dapc <- get_dapc_analysis(zscores, 3, pipeline_path)
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
@@ -570,6 +603,47 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                                  "MGR Microbe–Supertype Associations for Microbes Present 99+ Times", 
                                  "MGR_Supertype_Microbe_WaldZ_Heatmap",
                                  "MGR_GLM_analysis_data")
+  
+  microbe_recomb_data <- read.csv(paste0(pipeline_path, "GLMOTUMH-021521.csv"))
+  
+  get_indv_unique_recombs <- function(fish, recombs){
+
+    return(recombs[grepl(paste0("^", fish, "_"), names(recombs))])
+    #returns unique alleles for that individual
+    #the reason names are ordered is so that they can be fed into FABOX, which 
+    #numbers unique alleles in the order that they appear
+    #JLA used this in her analysis, and the order written in her thesis (pg. 69)
+    #so this is beneficial to confirm her results via running the same FABOX analysis
+    #although JLA's wasn't run on the GS, but a previous version
+      
+  }
+  
+  ordered_names <- gsub("^([A-Za-z]+)(\\d+).*$", "\\1W\\2", unlist(strsplit("SI01-15 NP01-17 NP02-17 NP03-17 NP04-17 NP05-17 CC16-17 WE01-15 WE02-15 WE03-15 WE06-17 WE07-17 WE08-17 WE09-17 WE10-17 WE11-17 AK01-15 AK12-17 AK13-17 AK14-17 AK15-17", " ")))
+  
+  indv_unique_recombs <- lapply(ordered_names, get_indv_unique_recombs, recombs=recombs)
+
+  write.fasta(as.list(unlist(indv_unique_recombs)), names=names(unlist(indv_unique_recombs)), paste0(pipeline_path, "forFABOX.fasta"))
+  
+  recomb_freqs <- read.csv(paste0(pipeline_path, "fabox_results.csv"))[, c(2, 3, 5)]
+  
+  colnames(recomb_freqs) <- c("UNIQUE_RECOMB", "FREQ", "RECOMB")
+  
+  recomb_freqs$UNIQUE_RECOMB <- sprintf("AB%03d", as.numeric(recomb_freqs$UNIQUE_RECOMB))
+  
+  recomb_freqs <- separate_rows(recomb_freqs, RECOMB, sep = "\n")
+  
+  View(recomb_freqs)
+  
+  #for each recomb, get its individual and unique_recomb
+  #now, each individual is associated with a microbe 
+  #hence, each unique_recomb is associated with a microbe
+  #run GLM between unique_recombs and microbes
+  #export the results as a heatmap
+  #get the individual recombs and their supertypes from the dapc
+  #then, replace the supertype block in the GLMTOTUST file with that
+  #then, run a GLM between ST and Microbes and export heatmap
+  #if it generates the same heatmap as already, then JLA used her data correctly
+  #if not, then something went wrong, or was tampered with, between the analyses
   
 }
 
