@@ -8,7 +8,6 @@
 # run all of the same comparison analyses using the data in the allele_seq_data_df dataset
 
 library("seqinr")
-library("waldo")
 library("dplyr")
 library("purrr")
 
@@ -128,22 +127,26 @@ main <- function(phasepath, p){
       
     )
     
+    
     return(list(input_alleles_data, alleles_by_indv, phased_allele_freqs))
     
   }
   
   AB_out_data <- get_out_analysis(AB_outpath)
   AB_out_df <- AB_out_data[[1]]
+  View(AB_out_df)
   AB_allele_nums <- c(rbind(as.integer(sapply(AB_out_data[[2]], `[`, 2)), as.integer(sapply(AB_out_data[[2]], `[`, 3))))
   AB_freqs <- AB_out_data[[3]]
   
   alpha_out_data <- get_out_analysis(alpha_outpath)
   alpha_out_df <- alpha_out_data[[1]]
+  View(alpha_out_df)
   alpha_allele_nums <- c(rbind(as.integer(sapply(alpha_out_data[[2]], `[`, 2)), as.integer(sapply(alpha_out_data[[2]], `[`, 3))))
   alpha_freqs <- alpha_out_data[[3]]
   
   beta_out_data <- get_out_analysis(beta_outpath)
   beta_out_df <- beta_out_data[[1]]
+  View(beta_out_df)
   beta_allele_nums <- c(rbind(as.integer(sapply(beta_out_data[[2]], `[`, 2)), as.integer(sapply(beta_out_data[[2]], `[`, 3))))
   beta_freqs <- beta_out_data[[3]]
   
@@ -189,7 +192,7 @@ main <- function(phasepath, p){
   
 
   
-  allele_seq_df <<- merge(phased_df, unphased_df, by = "INDIVIDUAL", all.x = TRUE, sort = FALSE)
+  allele_seq_df <- merge(phased_df, unphased_df, by = "INDIVIDUAL", all.x = TRUE, sort = FALSE)
   
   allele_seq_df <- allele_seq_df[ , c(
     "INDIVIDUAL", "UNPHASED_AB", "AB_ALPHA", "AB_BETA", "AB_FREQUENCY", 
@@ -200,11 +203,14 @@ main <- function(phasepath, p){
   
   
   
-  get_mismatches <- function(indv, allele_seq_df, ab_col, a_b_col, A_B_sequences, init_index, freq){
+  get_mismatches <- function(indv, allele_seq_df, ab_col, a_b_col, A_B_sequences, init_index, freq, AB_out_df, A_B_out_df){
     
     indv_mismatches <- data.frame()
     
     indv_data <- allele_seq_df[allele_seq_df$INDIVIDUAL == indv, ]
+    
+    AB_confs <- AB_out_df[AB_out_df$INDIVIDUAL == indv, ]
+    A_B_confs <- A_B_out_df[A_B_out_df$INDIVIDUAL == indv, ]
     
     ab_data <- indv_data[[ab_col]]
     a_b_data <- indv_data[[a_b_col]]
@@ -254,6 +260,9 @@ main <- function(phasepath, p){
             A_B_UNPHASED = a_b_seqs_chars[comparison_two],
             AB_FREQ = indv_data$AB_FREQUENCY[1],
             A_B_FREQ = indv_data[[freq]][2],
+            AB_CONF = unlist(AB_confs[, as.character(comparison_two + init_index)]),
+            A_B_CONF = unlist(A_B_confs[, as.character(comparison_two)]),
+            
             OTHER_SNPS = has_other_snps,
             SECTION = a_b_col,
             
@@ -276,6 +285,8 @@ main <- function(phasepath, p){
               A_B_UNPHASED = a_b_seqs_chars[comparison_four],
               AB_FREQ = indv_data$AB_FREQUENCY[2],
               A_B_FREQ = indv_data[[freq]][1],
+              AB_CONF = unlist(AB_confs[, as.character(comparison_four + init_index)]),
+              A_B_CONF = unlist(A_B_confs[, as.character(comparison_four)]),
               OTHER_SNPS = has_other_snps,
               SECTION = a_b_col,
               
@@ -309,6 +320,8 @@ main <- function(phasepath, p){
             A_B_UNPHASED = a_b_seqs_chars[comparison_one],
             AB_FREQ = indv_data$AB_FREQUENCY[1],
             A_B_FREQ = indv_data[[freq]][1],
+            AB_CONF = unlist(AB_confs[, as.character(comparison_one + init_index)]),
+            A_B_CONF = unlist(A_B_confs[, as.character(comparison_one)]),
             OTHER_SNPS = has_other_snps,
             SECTION = a_b_col,
             
@@ -333,6 +346,8 @@ main <- function(phasepath, p){
               A_B_UNPHASED = a_b_seqs_chars[comparison_three], 
               AB_FREQ = indv_data$AB_FREQUENCY[2],
               A_B_FREQ = indv_data[[freq]][2],
+              AB_CONF = unlist(AB_confs[, as.character(comparison_three + init_index)]),
+              A_B_CONF = unlist(A_B_confs[, as.character(comparison_three)]),
               OTHER_SNPS = has_other_snps,
               SECTION = a_b_col,
               
@@ -350,7 +365,7 @@ main <- function(phasepath, p){
     
   }
   
-  compare_alleles <- function(allele_seq_df, is_alpha){
+  compare_alleles <- function(allele_seq_df, is_alpha, AB_out_df, A_B_out_df){
     
     unique_individuals <- unique(allele_seq_df$INDIVIDUAL)
     
@@ -361,7 +376,7 @@ main <- function(phasepath, p){
       
       alpha_mismatches <- map_dfr(unique_individuals, function(indv) {
         
-        get_mismatches(indv, allele_seq_df, "AB_ALPHA", "ALPHA", "UNPHASED_ALPHA", 0, "ALPHA_FREQUENCY")
+        get_mismatches(indv, allele_seq_df, "AB_ALPHA", "ALPHA", "UNPHASED_ALPHA", 0, "ALPHA_FREQUENCY", AB_out_df, A_B_out_df)
         
       })
       
@@ -374,7 +389,7 @@ main <- function(phasepath, p){
       
       beta_mismatches <- map_dfr(unique_individuals, function(indv) {
         
-        get_mismatches(indv, allele_seq_df, "AB_BETA", "BETA", "UNPHASED_BETA", 246, "BETA_FREQUENCY")
+        get_mismatches(indv, allele_seq_df, "AB_BETA", "BETA", "UNPHASED_BETA", 246, "BETA_FREQUENCY", AB_out_df, A_B_out_df)
       
         })
       
@@ -385,10 +400,14 @@ main <- function(phasepath, p){
     
   }
   
-  mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE), 
-                           compare_alleles(allele_seq_df, is_alpha=FALSE)))
+  mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE, AB_out_df, alpha_out_df), 
+                           compare_alleles(allele_seq_df, is_alpha=FALSE, AB_out_df, beta_out_df)))
+  
+  rownames(mismatch_df) <- NULL
   
   View(mismatch_df)
+  
+  write.csv(mismatch_df, "PHASE_pipeline/mismatch_df.csv")
 
   
 }
