@@ -81,8 +81,10 @@ remove_recco <- function(recombs, pipeline_path){
   
   recco_path <- paste0(pipeline_path, "recco_results.csv")
   
-  recco_names <- read.delim(recco_path)$Sequence
+  recco_results <- read.delim(recco_path)
+  recco_names <- recco_results$Sequence[recco_results$Aln.pv <= 0.05]
   #RECCO's output file is TSV, not CSV like it says
+  #where p <= 0.05 for 
   
   return(recombs[!names(recombs) %in% recco_names])
   
@@ -101,19 +103,19 @@ get_datamonkey <- function(slac, meme, fel){
   
   slac <- read.csv(slac)
   
-  slac_sites <- c(slac[slac$"P..dN.dS...1." < 0.05, ]$"Site")
+  slac_sites <- c(slac[slac$"P..dN.dS...1." <= 0.05, ]$"Site")
   #CSV compresses headers; this corresponds with the positive selection header
   #P [dN/dS > 1]
   
   meme <- fromJSON(meme)$MLE$content$`0`
   #where the data lies
   
-  meme_sites <- c(which(meme[,7] < 0.05))
+  meme_sites <- c(which(meme[,7] <= 0.05))
   #7th column is p values, and all p values < 0.05 are pos selection
   
   fel <- fromJSON(fel)$MLE$content$`0`
   
-  fel_sites <- c(which(fel[,5] < 0.05))
+  fel_sites <- c(which(fel[,5] <= 0.05))
   #5th column is p values, and all p values < 0.05 are pos selection
   
   freq_table <- table(c(slac_sites, meme_sites, fel_sites))
@@ -205,7 +207,7 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_path){
   
   pdf(paste0(pipeline_path,"A_optimization_graph_MGR.pdf"), width = 10, height = 10)
 
-  a_spline_data <- optim.a.score(test_dapc, n.sim=1000)
+  a_spline_data <- optim.a.score(test_dapc, n.sim=10)
   #finds the optimal number of principal components
   
   dev.off()
@@ -468,7 +470,9 @@ get_microbe_supertype_analysis <- function(pipeline_path, microbe_supertype_data
   #makes each read count relative to the total number of reads for that seahorse
   #bind back the supertype data for GLM analyses
 
-  absolute_microbe_supertype_glm_df <- get_glm_analyses(microbe_supertype_data, colnames(kept_microbe_data), used_supertypes)
+  absolute_microbe_supertype_glm_df <- get_glm_analyses(microbe_supertype_data, 
+                                                        colnames(kept_microbe_data), 
+                                                        used_supertypes)
   
   #run GLM on absolute values for microbe_supertype counts
   #exact same results for the relative data
@@ -576,7 +580,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   zscores <- get_z_scores(recomb_proteins_pos_sel)
   #makes Z-scores of each immune amino acid into a data frame
   
-  final_dapc <- get_dapc_analysis(zscores, 3, pipeline_path)
+  final_dapc <<- get_dapc_analysis(zscores, 1, pipeline_path)
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
@@ -595,7 +599,9 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #calculates the GLM for each supertype-microbe association 
   #puts results into dataframes and generates a heatmap
   
-  microbe_supertype_data <- get_my_microbe_supertype_data(analyzed_supertypes_df, microbe_supertype_data, kept_microbe_data)
+  microbe_supertype_data <- get_my_microbe_supertype_data(analyzed_supertypes_df, 
+                                                          microbe_supertype_data, 
+                                                          kept_microbe_data)
   
   kept_microbe_data <- get_microbe_supertype_analysis(pipeline_path, 
                                  microbe_supertype_data, 
@@ -604,7 +610,28 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                                  "MGR_Supertype_Microbe_WaldZ_Heatmap",
                                  "MGR_GLM_analysis_data")
   
-  microbe_recomb_data <- read.csv(paste0(pipeline_path, "GLMOTUMH-021521.csv"))
+  microbe_recomb_data <- read.csv(paste0(pipeline_path, "GLMOTUMH-021521.csv"))[,-1]
+  #excludes numbered row named "X" automatically in the CSV
+  
+  used_recombs <- grep(x = colnames(microbe_recomb_data), pattern = "^AB",value=TRUE)
+  #supertypes (from JLA's DAPC analysis) associated with each seahorse 
+  
+  microbe_recomb_data <- microbe_recomb_data[, !(colnames(microbe_recomb_data) %in% used_recombs)]
+  
+  rownames(microbe_recomb_data) <- microbe_recomb_data$FISH
+  
+  microbe_recomb_data <- microbe_recomb_data[,-1]
+  
+  View(microbe_recomb_data)
+  
+  rownames(microbe_supertype_data) <- microbe_supertype_data$FISH
+  microbe_supertype_data <- microbe_supertype_data[, -1]
+  
+  microbe_supertype_data <- microbe_supertype_data[, !(colnames(microbe_supertype_data) %in% grep(x = colnames(microbe_supertype_data), pattern = "^S",value=TRUE))]
+  
+  View(microbe_supertype_data)
+  
+  identical(microbe_supertype_data, microbe_recomb_data)
   
   get_indv_unique_recombs <- function(fish, recombs){
 
@@ -624,6 +651,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
 
   write.fasta(as.list(unlist(indv_unique_recombs)), names=names(unlist(indv_unique_recombs)), paste0(pipeline_path, "forFABOX.fasta"))
   
+  #FaBox exports results as HTML, convert to CSV and use that file here
+  
   recomb_freqs <- read.csv(paste0(pipeline_path, "fabox_results.csv"))[, c(2, 3, 5)]
   
   colnames(recomb_freqs) <- c("UNIQUE_RECOMB", "FREQ", "RECOMB")
@@ -632,7 +661,76 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   recomb_freqs <- separate_rows(recomb_freqs, RECOMB, sep = "\n")
   
+  recomb_freqs <- cbind(recomb_freqs, SUPERTYPE = data.frame(final_dapc$grp)[c(recomb_freqs$RECOMB) , ])
+  
+  recomb_freqs <- cbind(recomb_freqs, data.frame(INDIVIDUAL = gsub("_.*", "", recomb_freqs$RECOMB)))
+  
+  recomb_freqs <- cbind(recomb_freqs, microbe_recomb_data[recomb_freqs$INDIVIDUAL, ])
+  
+  rownames(recomb_freqs) <- NULL
+  
   View(recomb_freqs)
+  
+  kept_microbe_names <- colnames(microbe_recomb_data)
+  
+  used_recombs <- unique(recomb_freqs$UNIQUE_RECOMB)
+  
+  get_glm_analyses <- function(sr_data, kept_microbe_names, used_recombs) {
+    
+    cat("\nCalculating GLM... This may take a moment...\n")
+    
+    recomb_microbe_combos <- expand.grid(Microbe = kept_microbe_names,
+                                            Recombinant = used_recombs,
+                                            stringsAsFactors = FALSE)
+    
+    #all SupertypeMicrobe combinations for GLM analyses
+    #helps establish statistical patterns between any combo
+    
+    GLMresults <- apply(recomb_microbe_combos, MARGIN = 1, FUN = function(recomb_microbe) {
+      
+      recomb <- unname(recomb_microbe["Recombinant"])
+      microbe   <- unname(recomb_microbe["Microbe"])
+      
+      glm_analysis <- suppressWarnings(coef(summary(glm(sr_data[, recomb] ~ sr_data[, microbe], 
+                                                        family = quasibinomial(link = "logit")))))
+      
+      #the actual GLM analysis for each association
+      
+      data.frame(
+        RECOMB_MICROBE = paste0(recomb, microbe), 
+        MICROBE = microbe, 
+        RECOMB = recomb, 
+        SLOPE = glm_analysis[2], 
+        SE = glm_analysis[4], 
+        WALDZ = (glm_analysis[2] / glm_analysis[4]),
+        p=glm_analysis[8],
+        stringsAsFactors = FALSE
+      )
+    })
+    
+    #rid of pointless rownames by unnaming them
+    #run GLM analysis between all supertypes and microbes 
+    #(accessing parts of expand.grid is faster than nested for loops)
+    
+    final_glm_df <- do.call(rbind, GLMresults)
+    #all GLM analyses info bound into dataframe
+    
+    final_glm_df$SEQ_BONFERRONI_p <- p.adjust(final_glm_df$p, method = "holm")
+    #Sequential Bonferroni correction (Holm-Bonferroni) along the entire dataframe
+    
+    final_glm_df$SIGNIFICANCE <- as.character(symnum(final_glm_df$SEQ_BONFERRONI_p, 
+                                                     corr = FALSE, 
+                                                     na = FALSE, 
+                                                     cutpoints = c(0, 0.001, 0.01, 0.05, 1), 
+                                                     symbols = c("***", "**", "*", "")))
+    
+    #stars based on the significance of the Bonferroni-corrected association
+    #doesnt try to reformat associations, just does 1:1 significance:symbol mapping
+    #if there's an NA, prints "" insteas of R's default "?"
+    
+    return(final_glm_df)
+    
+  }           
   
   #for each recomb, get its individual and unique_recomb
   #now, each individual is associated with a microbe 
@@ -644,6 +742,10 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #then, run a GLM between ST and Microbes and export heatmap
   #if it generates the same heatmap as already, then JLA used her data correctly
   #if not, then something went wrong, or was tampered with, between the analyses
+  
+  #lapply()
+  
+  #do a get_microbe_supertype_analysis on supertype-recombs 
   
 }
 
