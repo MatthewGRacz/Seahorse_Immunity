@@ -9,6 +9,7 @@ library("jsonlite")
 library("vegan")
 library("tidyverse")
 library("rvest")
+library("parallel")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
@@ -342,7 +343,9 @@ get_glm_and_heatmap <- function(pipeline_path,
                                 min_reads, 
                                 num_microbes, 
                                 heatmap_title, 
-                                heatmap_file_name){
+                                heatmap_file_name, 
+                                x_scale,
+                                y_scale){
   
   attribute_symbol <- paste0("^", attribute_symbol)
   #for regular expression functions
@@ -371,8 +374,12 @@ get_glm_and_heatmap <- function(pipeline_path,
     
     c("Microbe", attribute_name))
   
+  cat("\nCalcuating GLM... This may take a moment...\n")
   
-  GLMresults <- apply(microbe_attribute_combos, MARGIN = 1, FUN = function(microbe_attribute) {
+  cl <- makeCluster(detectCores() - 1)
+  clusterExport(cl, c("attribute_data", "used_microbes", "attribute_name"), envir = environment())
+
+  GLMresults <- parApply(cl, microbe_attribute_combos, MARGIN = 1, FUN = function(microbe_attribute) {
     
     attribute <- unname(microbe_attribute[[attribute_name]])
     microbe   <- unname(microbe_attribute["Microbe"])
@@ -395,6 +402,8 @@ get_glm_and_heatmap <- function(pipeline_path,
     
   })
   
+  stopCluster(cl)
+  
   GLMresults <- do.call(rbind, GLMresults)
   
   GLMresults$SEQ_BONFERRONI_P <- p.adjust(GLMresults$P, method = "holm")
@@ -408,6 +417,8 @@ get_glm_and_heatmap <- function(pipeline_path,
   
   GLMresults <- GLMresults[GLMresults$MICROBE %in% names(sort(colSums(used_microbes, na.rm = TRUE), decreasing = TRUE))[1:num_microbes], ]
   
+  cat("\nGLM calculations complete!\n")
+  
   min_z <- min(GLMresults$WALDZ, na.rm = TRUE)
   max_z <- max(GLMresults$WALDZ, na.rm = TRUE)
   mid_z <- (min_z + max_z)/2
@@ -417,7 +428,7 @@ get_glm_and_heatmap <- function(pipeline_path,
     geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 5, vjust = 0.7)  +
     scale_color_manual(values = c("TRUE" = "white", "FALSE" = "black"), guide = "none") +
     scale_fill_gradient2(
-      low = "blue", mid="hotpink", high = "#ff0026", 
+      low = "white", mid="#A6A6A6", high = "black", 
       midpoint=mid_z,
       limits = c(min_z, max_z),
       breaks = c(min_z, max_z),
@@ -426,16 +437,18 @@ get_glm_and_heatmap <- function(pipeline_path,
     ) +
     guides(fill = guide_colorbar(frame.color = "black", frame.linewidth = 0.2)) +
     theme_minimal() +
+    scale_x_discrete(position = "top") +
     theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
+      axis.text.x = element_text(angle = 0, hjust = 0),
       axis.text.y = element_text(size = 8)
     ) +
     labs(title = heatmap_title, x = attribute_name , y = "Microbe")
   
   suppressWarnings(ggsave(paste0(pipeline_path, heatmap_file_name, ".pdf"), 
                           plot = heatmap, 
-                          width = 10, 
-                          height = 8))
+                          width = length(unique(GLMresults$ATTRIBUTE)) * x_scale, 
+                          height = num_microbes * y_scale,
+                          limitsize = FALSE))
   
 }
 
@@ -546,7 +559,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   recomb_freqs <- recomb_freqs
   
-  View(recomb_freqs)
+  #View(recomb_freqs)
   
   microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
   microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
@@ -563,7 +576,9 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       100, 
                       32, 
                       "JLA Microbe–Supertype Associations for Microbes Present 99+ Times", 
-                      "JLA_Supertype_Microbe_WaldZ_Heatmap")
+                      "JLA_Supertype_Microbe_WaldZ_Heatmap",
+                      0.7,
+                      0.25)
   
   attribute_data <- +(table(analyzed_supertypes_df) > 0) 
   attribute_data <- attribute_data[rownames(attribute_data) %in% rownames(microbe_data), ]
@@ -588,7 +603,9 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       100, 
                       32, 
                       "MGR Microbe–Supertype Associations for Microbes Present 99+ Times", 
-                      "MGR_Supertype_Microbe_WaldZ_Heatmap")
+                      "MGR_Supertype_Microbe_WaldZ_Heatmap",
+                      0.7,
+                      0.25)
   
   
   microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUMH-021521.csv"))
@@ -596,18 +613,22 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   microbe_data <- microbe_attribute_data[, grep(x = colnames(microbe_attribute_data), pattern = "^M", value=TRUE)]
   #microbe data is the same for the G and H (Microbe vs Supertype and Microbe vs Unique_Recombinant)
   
+  attribute_data <- microbe_attribute_data[, grep(x = colnames(microbe_attribute_data), pattern = "^AB", value=TRUE)]
+  attribute_freqs <- colSums(attribute_data)
+  
   get_glm_and_heatmap(pipeline_path, 
                       microbe_attribute_data, 
                       microbe_data, 
                       "AB", 
                       "Unique Recombinant", 
                       NULL, 
-                      NULL, 
+                      attribute_freqs, 
                       0, 
                       32, 
                       "JLA Microbe–Unique Recombinant Associations for All Microbes", 
-                      "JLA_UniqueRecombinant_Microbe_WaldZ_Heatmap")
-  
+                      "JLA_UniqueRecombinant_Microbe_WaldZ_Heatmap",
+                      0.60,
+                      0.25)
   
   attribute_data <- +(table(recomb_freqs[, c("INDIVIDUAL", "UNIQUE_RECOMB")]) > 0) 
   #logical vectors of if a unique_recomb is present or not per individual
@@ -629,28 +650,10 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       0, 
                       32, 
                       "MGR Microbe–Unique Recombinant Associations for All Microbes", 
-                      "MGR_UniqueRecombinant_Microbe_WaldZ_Heatmap")
+                      "MGR_UniqueRecombinant_Microbe_WaldZ_Heatmap",
+                      0.60,
+                      0.25)
   
-  
-  
-  
-  
-  
-  
-  #for each recomb, get its individual and unique_recomb
-  #now, each individual is associated with a microbe 
-  #hence, each unique_recomb is associated with a microbe
-  #run GLM between unique_recombs and microbes
-  #export the results as a heatmap
-  #get the individual recombs and their supertypes from the dapc
-  #then, replace the supertype block in the GLMTOTUST file with that
-  #then, run a GLM between ST and Microbes and export heatmap
-  #if it generates the same heatmap as already, then JLA used her data correctly
-  #if not, then something went wrong, or was tampered with, between the analyses
-  
-  #lapply()
-  
-  #do a get_microbe_supertype_analysis on supertype-recombs 
   
 }
 
