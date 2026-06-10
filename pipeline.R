@@ -487,6 +487,8 @@ get_microbe_supertype_analysis <- function(pipeline_path, microbe_supertype_data
                     heatmap_title, 
                     heatmap_file_name)
   
+  View(kept_microbe_data)
+  
   return(kept_microbe_data)
   
   #creates heatmap for each microbe-supertype association
@@ -584,11 +586,13 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
-  analyzed_supertypes_df <- get_supertypes(final_dapc)
+  analyzed_supertypes_df <<- get_supertypes(final_dapc)
   #gets supertypes of all recombinants and their population
   
   microbe_supertype_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
   #reads per microbe for individual seahorse, whose supertypes can be accessed with the previous dataframe
+  
+  
   
   kept_microbe_data <- get_microbe_supertype_analysis(pipeline_path, 
                                  microbe_supertype_data, 
@@ -629,7 +633,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   microbe_supertype_data <- microbe_supertype_data[, !(colnames(microbe_supertype_data) %in% grep(x = colnames(microbe_supertype_data), pattern = "^S",value=TRUE))]
   
-  View(microbe_supertype_data)
+  #View(microbe_supertype_data)
   
   identical(microbe_supertype_data, microbe_recomb_data)
   
@@ -668,6 +672,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   recomb_freqs <- cbind(recomb_freqs, microbe_recomb_data[recomb_freqs$INDIVIDUAL, ])
   
   rownames(recomb_freqs) <- NULL
+  
+  recomb_freqs <<- recomb_freqs
   
   View(recomb_freqs)
   
@@ -731,6 +737,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
     return(final_glm_df)
     
   }           
+  
+  get_glm_analyses()
   
   #for each recomb, get its individual and unique_recomb
   #now, each individual is associated with a microbe 
