@@ -85,7 +85,7 @@ remove_recco <- function(recombs, pipeline_path){
   recco_results <- read.delim(recco_path)
   recco_names <- recco_results$Sequence[recco_results$Aln.pv <= 0.05]
   #RECCO's output file is TSV, not CSV like it says
-  #where p <= 0.05 for 
+  #where flagged recombinants with p <= 0.05 for sequence alignment are removed
   
   return(recombs[!names(recombs) %in% recco_names])
   
@@ -348,7 +348,7 @@ get_glm_and_heatmap <- function(pipeline_path,
                                 y_scale){
   
   attribute_symbol <- paste0("^", attribute_symbol)
-  #for regular expression functions
+  #for regular expression (regex) functions
   
   if(is.null(attribute_data)){
     
@@ -374,12 +374,18 @@ get_glm_and_heatmap <- function(pipeline_path,
     
     c("Microbe", attribute_name))
   
+  #creates every Microbe-Attribute combo to run a GLM on
+  
   cat("\nCalcuating GLM... This may take a moment...\n")
   
   cl <- makeCluster(detectCores() - 1)
+  #uses all except 1 computer CPU core to run, since can take up to 8 hours!
+  
   clusterExport(cl, c("attribute_data", "used_microbes", "attribute_name"), envir = environment())
+  #exports relevant data to each subordinate R session that runs in parallel (parApply next line),
+  #each of which creates its own mini-environment
 
-  GLMresults <- parApply(cl, microbe_attribute_combos, MARGIN = 1, FUN = function(microbe_attribute) {
+  GLMresults <- suppressWarnings(parApply(cl, microbe_attribute_combos, MARGIN = 1, FUN = function(microbe_attribute) {
     
     attribute <- unname(microbe_attribute[[attribute_name]])
     microbe   <- unname(microbe_attribute["Microbe"])
@@ -400,9 +406,10 @@ get_glm_and_heatmap <- function(pipeline_path,
       stringsAsFactors = FALSE
     )
     
-  })
+  }))
   
   stopCluster(cl)
+  #return to normal CPU allocation and function after the parallel computations are done
   
   GLMresults <- do.call(rbind, GLMresults)
   
@@ -415,7 +422,11 @@ get_glm_and_heatmap <- function(pipeline_path,
                                                  cutpoints = c(0, 0.001, 0.01, 0.05, 1), 
                                                  symbols = c("***", "**", "*", "")))
   
+  #the corrected p value per GLM analysis gets marked with stars if p <= certain thresholds
+  
   GLMresults <- GLMresults[GLMresults$MICROBE %in% names(sort(colSums(used_microbes, na.rm = TRUE), decreasing = TRUE))[1:num_microbes], ]
+  
+  #get the top X most abundant microbes from the GLM results, to show for the heatmap
   
   cat("\nGLM calculations complete!\n")
   
@@ -439,16 +450,17 @@ get_glm_and_heatmap <- function(pipeline_path,
     theme_minimal() +
     scale_x_discrete(position = "top") +
     theme(
-      axis.text.x = element_text(angle = 0, hjust = 0),
-      axis.text.y = element_text(size = 8)
+      axis.text.x = element_text(size = x_scale * 13), 
+      axis.text.y = element_text(size = y_scale * 30), 
+      plot.title = element_text(size = 20 * x_scale, face = "bold"), 
+      axis.title.x = element_text(size = x_scale * 18, face = "bold"),
+      axis.title.y = element_text(size = y_scale * 50, face = "bold")
     ) +
     labs(title = heatmap_title, x = attribute_name , y = "Microbe")
   
-  suppressWarnings(ggsave(paste0(pipeline_path, heatmap_file_name, ".pdf"), 
-                          plot = heatmap, 
-                          width = length(unique(GLMresults$ATTRIBUTE)) * x_scale, 
-                          height = num_microbes * y_scale,
-                          limitsize = FALSE))
+  #suppressWarnings(ggsave(paste0(pipeline_path, heatmap_file_name, ".pdf"), plot = heatmap, width = x_scale * length(unique(GLMresults$ATTRIBUTE)), height = num_microbes * y_scale, limitsize = FALSE))
+  
+  print(heatmap)
   
 }
 
@@ -471,14 +483,16 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   }
   #creates Pipeline folder
   
+  recombs <- recombs[!grepl("^TA", names(recombs))]
+  #removes TA individuals before ch 4 analyses such as RECCO and DataMonkey
+  
   write.fasta(as.list(recombs), 
               names(recombs), 
               file.out=paste0(pipeline_path, "recombs.fasta"))
   #FASTA file of recombs
   
-  #run RECCO analyses on recombinants
-  
   recombs <- suppressWarnings(remove_recco(recombs, pipeline_path))
+  #run RECCO analyses on recombinants
   
   write.fasta(as.list(recombs), 
               names(recombs), 
@@ -535,7 +549,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   ordered_names <- gsub("^([A-Za-z]+)(\\d+).*$", "\\1W\\2", unlist(strsplit("SI01-15 NP01-17 NP02-17 NP03-17 NP04-17 NP05-17 CC16-17 WE01-15 WE02-15 WE03-15 WE06-17 WE07-17 WE08-17 WE09-17 WE10-17 WE11-17 AK01-15 AK12-17 AK13-17 AK14-17 AK15-17", " ")))
   
-  indv_unique_recombs <- lapply(ordered_names, get_indv_unique_recombs, recombs=recombs)
+  indv_unique_recombs <- lapply(ordered_names, get_indv_unique_recombs, recombs=read.fasta("/Users/mattracz/Projects/Wilson_Lab/Pipeline/recombs.fasta", as.string=TRUE))
 
   write.fasta(as.list(unlist(indv_unique_recombs)), names=names(unlist(indv_unique_recombs)), paste0(pipeline_path, "forFABOX.fasta"))
   
@@ -577,8 +591,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       32, 
                       "JLA Microbe–Supertype Associations for Microbes Present 99+ Times", 
                       "JLA_Supertype_Microbe_WaldZ_Heatmap",
-                      0.7,
-                      0.25)
+                      0.5,
+                      0.20)
   
   attribute_data <- +(table(analyzed_supertypes_df) > 0) 
   attribute_data <- attribute_data[rownames(attribute_data) %in% rownames(microbe_data), ]
@@ -623,12 +637,12 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       "Unique Recombinant", 
                       NULL, 
                       attribute_freqs, 
-                      0, 
+                      100, 
                       32, 
                       "JLA Microbe–Unique Recombinant Associations for All Microbes", 
                       "JLA_UniqueRecombinant_Microbe_WaldZ_Heatmap",
-                      0.60,
-                      0.25)
+                      0.2,
+                      0.1)
   
   attribute_data <- +(table(recomb_freqs[, c("INDIVIDUAL", "UNIQUE_RECOMB")]) > 0) 
   #logical vectors of if a unique_recomb is present or not per individual
@@ -647,12 +661,12 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       "Unique Recombinant", 
                       attribute_data, 
                       attribute_freqs, 
-                      0, 
+                      100, 
                       32, 
                       "MGR Microbe–Unique Recombinant Associations for All Microbes", 
                       "MGR_UniqueRecombinant_Microbe_WaldZ_Heatmap",
-                      0.60,
-                      0.25)
+                      0.2,
+                      0.1)
   
   
 }
