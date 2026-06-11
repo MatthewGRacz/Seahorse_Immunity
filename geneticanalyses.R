@@ -13,18 +13,18 @@ library("purrr")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
-get_A_B_recombs <- function(alpha_seqs, beta_seqs){
+get_A_B_recombs <- function(phased_alpha, phased_beta){
   
-  indv_names <- unique(gsub("[ab]$", "", names(alpha_seqs)))
+  indv_names <- unique(gsub("[ab]$", "", names(phased_alpha)))
   #get names of individuals whose sequences you're looking at
   
-  a1b1 <- toupper(paste0(alpha_seqs[paste0(indv_names, "a")], beta_seqs[paste0(indv_names, "a")]))
+  a1b1 <- toupper(paste0(phased_alpha[paste0(indv_names, "a")], phased_beta[paste0(indv_names, "a")]))
   #a = 1st allele, b = 2nd allele, per individual
   #the snipped betas have 2 extra bps ahead and 1 extra bp behind, so cut them out
   #trims to functional reading frames
-  a1b2 <- toupper(paste0(alpha_seqs[paste0(indv_names, "a")], beta_seqs[paste0(indv_names, "b")]))
-  a2b1 <- toupper(paste0(alpha_seqs[paste0(indv_names, "b")], beta_seqs[paste0(indv_names, "a")]))
-  a2b2 <- toupper(paste0(alpha_seqs[paste0(indv_names, "b")], beta_seqs[paste0(indv_names, "b")]))
+  a1b2 <- toupper(paste0(phased_alpha[paste0(indv_names, "a")], phased_beta[paste0(indv_names, "b")]))
+  a2b1 <- toupper(paste0(phased_alpha[paste0(indv_names, "b")], phased_beta[paste0(indv_names, "a")]))
+  a2b2 <- toupper(paste0(phased_alpha[paste0(indv_names, "b")], phased_beta[paste0(indv_names, "b")]))
   
   return(c(
     
@@ -37,19 +37,19 @@ get_A_B_recombs <- function(alpha_seqs, beta_seqs){
   
 }
 
-get_AB_recombs <- function(AB_phasepath){
+get_AB_recombs <- function(phased_AB){
   
   
-  indv_names <- unique(gsub("[ab]$", "", names(AB_phasepath)))
+  indv_names <- unique(gsub("[ab]$", "", names(phased_AB)))
   #get names of individuals whose sequences you're looking at
   
-  a1b1 <- toupper(paste0(substr(AB_phasepath[paste0(indv_names, "a")], 1, 246), substr(AB_phasepath[paste0(indv_names, "a")], 247, 519)))
+  a1b1 <- toupper(paste0(substr(phased_AB[paste0(indv_names, "a")], 1, 246), substr(phased_AB[paste0(indv_names, "a")], 247, 519)))
   #a = 1st allele, b = 2nd allele, per individual
   #the snipped betas have 2 extra bps ahead and 1 extra bp behind, so cut them out
   #trims to functional reading frames
-  a1b2 <- toupper(paste0(substr(AB_phasepath[paste0(indv_names, "a")], 1, 246), substr(AB_phasepath[paste0(indv_names, "b")], 247, 519)))
-  a2b1 <- toupper(paste0(substr(AB_phasepath[paste0(indv_names, "b")], 1, 246), substr(AB_phasepath[paste0(indv_names, "a")], 247, 519)))
-  a2b2 <- toupper(paste0(substr(AB_phasepath[paste0(indv_names, "b")], 1, 246), substr(AB_phasepath[paste0(indv_names, "b")], 247, 519)))
+  a1b2 <- toupper(paste0(substr(phased_AB[paste0(indv_names, "a")], 1, 246), substr(phased_AB[paste0(indv_names, "b")], 247, 519)))
+  a2b1 <- toupper(paste0(substr(phased_AB[paste0(indv_names, "b")], 1, 246), substr(phased_AB[paste0(indv_names, "a")], 247, 519)))
+  a2b2 <- toupper(paste0(substr(phased_AB[paste0(indv_names, "b")], 1, 246), substr(phased_AB[paste0(indv_names, "b")], 247, 519)))
   
   return(c(
     
@@ -134,31 +134,30 @@ main <- function(phasepath, p){
   
   AB_out_data <- get_out_analysis(AB_outpath)
   AB_out_df <- AB_out_data[[1]]
-  View(AB_out_df)
+  #View(AB_out_df)
   AB_allele_nums <- c(rbind(as.integer(sapply(AB_out_data[[2]], `[`, 2)), as.integer(sapply(AB_out_data[[2]], `[`, 3))))
   AB_freqs <- AB_out_data[[3]]
   
   alpha_out_data <- get_out_analysis(alpha_outpath)
   alpha_out_df <- alpha_out_data[[1]]
-  View(alpha_out_df)
+  #View(alpha_out_df)
   alpha_allele_nums <- c(rbind(as.integer(sapply(alpha_out_data[[2]], `[`, 2)), as.integer(sapply(alpha_out_data[[2]], `[`, 3))))
   alpha_freqs <- alpha_out_data[[3]]
   
   beta_out_data <- get_out_analysis(beta_outpath)
   beta_out_df <- beta_out_data[[1]]
-  View(beta_out_df)
+  #View(beta_out_df)
   beta_allele_nums <- c(rbind(as.integer(sapply(beta_out_data[[2]], `[`, 2)), as.integer(sapply(beta_out_data[[2]], `[`, 3))))
   beta_freqs <- beta_out_data[[3]]
   
   
-  phased_AB <- suppressWarnings(toupper(read.fasta(paste0(phasepath, "phased.fasta"), as.string=TRUE)))
-  phased_alpha <- suppressWarnings(toupper(read.fasta(paste0(alpha_phasepath, "phased.fasta"), as.string=TRUE)))
-  phased_beta <- suppressWarnings(toupper(read.fasta(paste0(beta_phasepath, "phased.fasta"), as.string=TRUE)))
+  phased_AB <- suppressWarnings(toupper(unlist(read.fasta(paste0(phasepath, "phased.fasta"), as.string=TRUE))))
+  phased_alpha <- suppressWarnings(toupper(unlist(read.fasta(paste0(alpha_phasepath, "phased.fasta"), as.string=TRUE))))
+  phased_beta <- suppressWarnings(toupper(unlist(read.fasta(paste0(beta_phasepath, "phased.fasta"), as.string=TRUE))))
   
-  unphased_AB <- suppressWarnings(toupper(read.fasta(paste0(phasepath, "unphased.fasta"), as.string=TRUE)))
-  unphased_alpha <- suppressWarnings(toupper(read.fasta(paste0(alpha_phasepath, "unphased.fasta"), as.string=TRUE)))
-  unphased_beta <- suppressWarnings(toupper(read.fasta(paste0(beta_phasepath, "unphased.fasta"), as.string=TRUE)))
-
+  unphased_AB <- suppressWarnings(toupper(unlist(read.fasta(paste0(phasepath, "unphased.fasta"), as.string=TRUE))))
+  unphased_alpha <- suppressWarnings(toupper(unlist(read.fasta(paste0(alpha_phasepath, "unphased.fasta"), as.string=TRUE))))
+  unphased_beta <- suppressWarnings(toupper(unlist(read.fasta(paste0(beta_phasepath, "unphased.fasta"), as.string=TRUE))))
   
   phased_df <- data.frame(
     
@@ -199,7 +198,7 @@ main <- function(phasepath, p){
     "UNPHASED_ALPHA", "ALPHA", "ALPHA_FREQUENCY", 
     "UNPHASED_BETA", "BETA", "BETA_FREQUENCY" )]
   
-  View(allele_seq_df)
+  #View(allele_seq_df)
   
   
   
@@ -400,15 +399,26 @@ main <- function(phasepath, p){
     
   }
   
-  mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE, AB_out_df, alpha_out_df), 
-                           compare_alleles(allele_seq_df, is_alpha=FALSE, AB_out_df, beta_out_df)))
+  #mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE, AB_out_df, alpha_out_df), compare_alleles(allele_seq_df, is_alpha=FALSE, AB_out_df, beta_out_df)))
   
-  rownames(mismatch_df) <- NULL
+  #rownames(mismatch_df) <- NULL
   
-  View(mismatch_df)
+  #View(mismatch_df)
   
-  write.csv(mismatch_df, "PHASE_pipeline/mismatch_df.csv")
-
+  #write.csv(mismatch_df, "PHASE_pipeline/mismatch_df.csv")
+  
+  AB_recombs <- get_AB_recombs(phased_AB)
+  
+  print(length(unique(AB_recombs)))
+  
+  A_B_recombs <- get_A_B_recombs(phased_alpha, phased_beta)
+  
+  print(length(unique(A_B_recombs)))
+  print(length(unique(phased_alpha)))
+  print(length(unique(phased_beta)))
+  
+  print(length(unique(phased_AB)))
+  
   
 }
 

@@ -435,8 +435,8 @@ get_glm_and_heatmap <- function(pipeline_path,
   mid_z <- (min_z + max_z)/2
   
   heatmap <- ggplot(GLMresults, aes(x = paste0(ATTRIBUTE, "\n",  attribute_freqs[ATTRIBUTE]), y = MICROBE, fill = WALDZ)) +
-    geom_tile(color = "black") +
-    geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 5, vjust = 0.7)  +
+    geom_tile(color = "black", size=0.4) +
+    geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 4, vjust = 0.7)  +
     scale_color_manual(values = c("TRUE" = "white", "FALSE" = "black"), guide = "none") +
     scale_fill_gradient2(
       low = "white", mid="#A6A6A6", high = "black", 
@@ -452,8 +452,8 @@ get_glm_and_heatmap <- function(pipeline_path,
     theme(
       axis.text.x = element_text(size = x_scale * 13), 
       axis.text.y = element_text(size = y_scale * 30), 
-      plot.title = element_text(size = 20 * x_scale, face = "bold"), 
-      axis.title.x = element_text(size = x_scale * 18, face = "bold"),
+      plot.title = element_text(size = 70 * x_scale, face = "bold"), 
+      axis.title.x = element_text(size = x_scale * 50, face = "bold"),
       axis.title.y = element_text(size = y_scale * 50, face = "bold")
     ) +
     labs(title = heatmap_title, x = attribute_name , y = "Microbe")
@@ -494,12 +494,6 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   recombs <- suppressWarnings(remove_recco(recombs, pipeline_path))
   #run RECCO analyses on recombinants
   
-  write.fasta(as.list(recombs), 
-              names(recombs), 
-              file.out=paste0(pipeline_path, "recombs_postRECCO.fasta"))
-  
-  #send post-RECCO alleles to DataMonkey
-  
   recomb_proteins <- get_translation(recombs)
   
   recombs <- recombs[names(recombs) %in% names(recomb_proteins)]
@@ -509,8 +503,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
               names(recombs), 
               file.out=paste0(pipeline_path, "recombs_postRECCO.fasta"))
   
-  #overwrite the post-RECCO recombs file with recombs which do not produce a *
-  #send these to DataMonkey
+  #send post-RECCO alleles to DataMonkey
   
   datamonkey_codons <- get_datamonkey(paste0(pipeline_path, "slac.csv"), 
                                       paste0(pipeline_path, "meme.json"), 
@@ -550,7 +543,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   ordered_names <- gsub("^([A-Za-z]+)(\\d+).*$", "\\1W\\2", unlist(strsplit("SI01-15 NP01-17 NP02-17 NP03-17 NP04-17 NP05-17 CC16-17 WE01-15 WE02-15 WE03-15 WE06-17 WE07-17 WE08-17 WE09-17 WE10-17 WE11-17 AK01-15 AK12-17 AK13-17 AK14-17 AK15-17", " ")))
   
   indv_unique_recombs <- lapply(ordered_names, get_indv_unique_recombs, recombs=read.fasta("/Users/mattracz/Projects/Wilson_Lab/Pipeline/recombs.fasta", as.string=TRUE))
-
+  #done before RECCO filtering and after TA filtering
+  
   write.fasta(as.list(unlist(indv_unique_recombs)), names=names(unlist(indv_unique_recombs)), paste0(pipeline_path, "forFABOX.fasta"))
   
   #FaBox exports results as HTML, convert to CSV and use that file here
@@ -641,8 +635,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       32, 
                       "JLA Microbe–Unique Recombinant Associations for All Microbes", 
                       "JLA_UniqueRecombinant_Microbe_WaldZ_Heatmap",
-                      0.2,
-                      0.1)
+                      0.3,
+                      0.3)
   
   attribute_data <- +(table(recomb_freqs[, c("INDIVIDUAL", "UNIQUE_RECOMB")]) > 0) 
   #logical vectors of if a unique_recomb is present or not per individual
@@ -665,8 +659,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       32, 
                       "MGR Microbe–Unique Recombinant Associations for All Microbes", 
                       "MGR_UniqueRecombinant_Microbe_WaldZ_Heatmap",
-                      0.2,
-                      0.1)
+                      0.3,
+                      0.3)
   
   
 }
