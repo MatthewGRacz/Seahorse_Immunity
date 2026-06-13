@@ -350,6 +350,9 @@ get_glm_and_heatmap <- function(pipeline_path,
   attribute_symbol <- paste0("^", attribute_symbol)
   #for regular expression (regex) functions
   
+  attribute_data <- attribute_data[rownames(microbe_data), , drop = FALSE]
+  #puts it in the same order as JLA
+  
   if(is.null(attribute_data)){
     
     #set as NULL for JLA, since her data contains the logical vectors of presence/absence 
@@ -434,7 +437,7 @@ get_glm_and_heatmap <- function(pipeline_path,
   max_z <- max(GLMresults$WALDZ, na.rm = TRUE)
   mid_z <- (min_z + max_z)/2
   
-  heatmap <- ggplot(GLMresults, aes(x = paste0(ATTRIBUTE, "\n",  attribute_freqs[ATTRIBUTE]), y = MICROBE, fill = WALDZ)) +
+  heatmap <- suppressWarnings(ggplot(GLMresults, aes(x = paste0(ATTRIBUTE, "\n",  attribute_freqs[ATTRIBUTE]), y = MICROBE, fill = WALDZ)) +
     geom_tile(color = "black", size=0.4) +
     geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 4, vjust = 0.7)  +
     scale_color_manual(values = c("TRUE" = "white", "FALSE" = "black"), guide = "none") +
@@ -456,7 +459,7 @@ get_glm_and_heatmap <- function(pipeline_path,
       axis.title.x = element_text(size = x_scale * 50, face = "bold"),
       axis.title.y = element_text(size = y_scale * 50, face = "bold")
     ) +
-    labs(title = heatmap_title, x = attribute_name , y = "Microbe")
+    labs(title = heatmap_title, x = attribute_name , y = "Microbe"))
   
   #suppressWarnings(ggsave(paste0(pipeline_path, heatmap_file_name, ".pdf"), plot = heatmap, width = x_scale * length(unique(GLMresults$ATTRIBUTE)), height = num_microbes * y_scale, limitsize = FALSE))
   
@@ -486,6 +489,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   recombs <- recombs[!grepl("^TA", names(recombs))]
   #removes TA individuals before ch 4 analyses such as RECCO and DataMonkey
   
+  
   write.fasta(as.list(recombs), 
               names(recombs), 
               file.out=paste0(pipeline_path, "recombs.fasta"))
@@ -498,6 +502,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   recombs <- recombs[names(recombs) %in% names(recomb_proteins)]
   #only include sequences which didn't produce a * (stop codon)
+  
   
   write.fasta(as.list(recombs), 
               names(recombs), 
@@ -546,6 +551,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #done before RECCO filtering and after TA filtering
   
   write.fasta(as.list(unlist(indv_unique_recombs)), names=names(unlist(indv_unique_recombs)), paste0(pipeline_path, "forFABOX.fasta"))
+  
+  #print(length(unique(unlist(indv_unique_recombs))))
   
   #FaBox exports results as HTML, convert to CSV and use that file here
   
@@ -640,13 +647,12 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   attribute_data <- +(table(recomb_freqs[, c("INDIVIDUAL", "UNIQUE_RECOMB")]) > 0) 
   #logical vectors of if a unique_recomb is present or not per individual
-  #may differ based on what RECCO filters out, which is a bit stochastic, since some recombinants may not be in the
-  #final kept set of recombinants; the value is similar to JLA's but can differ
-  #this particular one is already defined for the individuals and their recombinants in JLA's microbe analysis
   #also, recomb_freqs already named the unique_recombs with the AB03d format, so no need for renaming
   
-  attribute_freqs <- table(recomb_freqs$UNIQUE_RECOMB)
-  #frequency of a unique_recomb throughout all individuals sampled for microbes
+  attribute_freqs <- colSums(attribute_data)
+  #how many individuals, not recombinants, have that unique_recomb; exactly what JLA did
+  
+  View(recomb_freqs)
   
   get_glm_and_heatmap(pipeline_path, 
                       microbe_attribute_data, 

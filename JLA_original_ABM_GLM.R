@@ -142,6 +142,8 @@ AlleleMicrobeAnalysis$SIGNIFICANCE <- as.character(symnum(AlleleMicrobeAnalysis$
                                                           cutpoints = c(0, 0.00001, 1), 
                                                           symbols = c("**", "")))
 
+write.csv(AlleleMicrobeAnalysis, file="/Users/mattracz/Projects/Wilson_Lab/Pipeline/CSV.csv")
+
 #get the top X most abundant microbes from the GLM results, to show for the heatmap
 
 min_z <- min(AlleleMicrobeAnalysis$WALDZ, na.rm = TRUE)
