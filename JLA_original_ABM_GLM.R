@@ -7,8 +7,12 @@
 #Edited Script to process alleles (AB) instead of supertypes(S)
 
 
-library(writexl)
-library(vegan)
+library("writexl")
+library("vegan")
+library("modeest")
+
+JLA_microbes <- c('M0008', 'M0003', 'M0006', 'M0016', 'M0044', 'M0018', 'M0061', 'M0081', 'M0031', 'M0014', 'M0012', 'M0007', 'M0015', 'M0019', 'M0011', 'M0005', 'M0010', 'M0030', 'M0041', 'M0085', 'M0029', 'M0020', 'M0048', 'M0013', 'M0002', 'M0004', 'M0023', 'M0032', 'M0064', 'M0001', 'M0017', 'M0009')
+#microbes JLA used for Ch 3 heatmap, in the order she has them from bottom up (how the heatmap automatically names the y-axis)
 
 #MHC Allele (IIa/IIb) vs. Microbe abundance (R vs. M)
 
@@ -49,7 +53,8 @@ Alleles<-grep(x = names(Gsubset), pattern = "^AB",value=TRUE)
 #Create a dataframe to store results
 AlleleMicrobeAnalysis<-data.frame()
 
-#Microbes <- c("M0104", "M0102", "M0064", "M0044", "M0037", "M0030", "M0026", "M0025", "M0024", "M0023", "M0022", "M0021", "M0020", "M0019", "M0018", "M0017", "M0016", "M0015", "M0014", "M0013", "M0012", "M0011", "M0010", "M0009", "M0008", "M0007", "M0006", "M0005", "M0004", "M0003", "M0002", "M0001")
+Microbes <- JLA_microbes
+#these are the actual microbes that JLA used in her analysis
 
 #GLM loop - store intercept, slope, se, p.value
 for (valM in Microbes) {
@@ -77,7 +82,7 @@ for (valM in Microbes) {
   }
 }     
 
-AlleleMicrobeAnalysis <- AlleleMicrobeAnalysis[AlleleMicrobeAnalysis$MICROBE %in% names(sort(colSums(Gsubset[, Microbes], na.rm = TRUE), decreasing = TRUE))[1:32], ]
+#AlleleMicrobeAnalysis <- AlleleMicrobeAnalysis[AlleleMicrobeAnalysis$MICROBE %in% names(sort(colSums(Gsubset[, Microbes], na.rm = TRUE), decreasing = TRUE))[1:32], ]
 
 
 #Write data to xlsx
@@ -128,7 +133,7 @@ for (valM in Microbes) {
   }
 }
 
-AlleleRelativeMicrobeAnalysis <- AlleleRelativeMicrobeAnalysis[AlleleRelativeMicrobeAnalysis$MICROBE %in% names(sort(colSums(Grelative[, Microbes], na.rm = TRUE), decreasing = TRUE))[1:32], ]
+#AlleleRelativeMicrobeAnalysis <- AlleleRelativeMicrobeAnalysis[AlleleRelativeMicrobeAnalysis$MICROBE %in% names(colSums(Grelative[, Microbes]))]
 
 #Write data to xlsx
 #write.xlsx(AlleleMicrobeAnalysis, "AlleleMicrobeAnalysis.xlsx")
@@ -142,7 +147,11 @@ AlleleMicrobeAnalysis$SIGNIFICANCE <- as.character(symnum(AlleleMicrobeAnalysis$
                                                           cutpoints = c(0, 0.00001, 1), 
                                                           symbols = c("**", "")))
 
-write.csv(AlleleMicrobeAnalysis, file="/Users/mattracz/Projects/Wilson_Lab/Pipeline/CSV.csv")
+AlleleMicrobeAnalysis$MICROBE <- factor(AlleleMicrobeAnalysis$MICROBE, 
+                                        levels = JLA_microbes)
+#keeps the microbes in the order they're in
+
+write.csv(AlleleMicrobeAnalysis, file="/Users/mattracz/Projects/Wilson_Lab/Pipeline/JLA_UniqueRecombMicrobe_Data.csv")
 
 #get the top X most abundant microbes from the GLM results, to show for the heatmap
 
@@ -181,6 +190,9 @@ AlleleRelativeMicrobeAnalysis$SIGNIFICANCE <- as.character(symnum(AlleleRelative
                                                                   na = FALSE, 
                                                                   cutpoints = c(0, 0.00001, 1), 
                                                                   symbols = c("**", "")))
+
+AlleleRelativeMicrobeAnalysis$MICROBE <- factor(AlleleRelativeMicrobeAnalysis$MICROBE, 
+                                        levels = JLA_microbes)
 
 #get the top X most abundant microbes from the GLM results, to show for the heatmap
 
