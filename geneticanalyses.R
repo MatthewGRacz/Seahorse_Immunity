@@ -65,8 +65,8 @@ get_AB_recombs <- function(phased_AB){
 
 main <- function(phasepath, p){
   
-  alpha_phasepath <- sub("(.*PHASE_)AB", "\\1A", phasepath)
-  beta_phasepath <- sub("(.*PHASE_)AB", "\\1B", phasepath)
+  alpha_phasepath <- "PHASED/p=0.5/CLONES/PHASE_A_CLONES/"
+  beta_phasepath <- "PHASED/p=0.5/CLONES/PHASE_B_CLONES/"
   
   AB_outpath <- paste0(phasepath, "seqphase.out")
   alpha_outpath <- paste0(alpha_phasepath, "seqphase.out")
@@ -134,19 +134,19 @@ main <- function(phasepath, p){
   
   AB_out_data <- get_out_analysis(AB_outpath)
   AB_out_df <- AB_out_data[[1]]
-  #View(AB_out_df)
+  View(AB_out_df)
   AB_allele_nums <- c(rbind(as.integer(sapply(AB_out_data[[2]], `[`, 2)), as.integer(sapply(AB_out_data[[2]], `[`, 3))))
   AB_freqs <- AB_out_data[[3]]
   
   alpha_out_data <- get_out_analysis(alpha_outpath)
   alpha_out_df <- alpha_out_data[[1]]
-  #View(alpha_out_df)
+  View(alpha_out_df)
   alpha_allele_nums <- c(rbind(as.integer(sapply(alpha_out_data[[2]], `[`, 2)), as.integer(sapply(alpha_out_data[[2]], `[`, 3))))
   alpha_freqs <- alpha_out_data[[3]]
   
   beta_out_data <- get_out_analysis(beta_outpath)
   beta_out_df <- beta_out_data[[1]]
-  #View(beta_out_df)
+  View(beta_out_df)
   beta_allele_nums <- c(rbind(as.integer(sapply(beta_out_data[[2]], `[`, 2)), as.integer(sapply(beta_out_data[[2]], `[`, 3))))
   beta_freqs <- beta_out_data[[3]]
   
@@ -399,13 +399,13 @@ main <- function(phasepath, p){
     
   }
   
-  #mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE, AB_out_df, alpha_out_df), compare_alleles(allele_seq_df, is_alpha=FALSE, AB_out_df, beta_out_df)))
+  mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE, AB_out_df, alpha_out_df), compare_alleles(allele_seq_df, is_alpha=FALSE, AB_out_df, beta_out_df)))
   
-  #rownames(mismatch_df) <- NULL
+  rownames(mismatch_df) <- NULL
   
-  #View(mismatch_df)
+  View(mismatch_df)
   
-  #write.csv(mismatch_df, "PHASE_pipeline/mismatch_df.csv")
+  write.csv(mismatch_df, "PHASE_pipeline/mismatch_df_againstclones.csv")
   
   AB_recombs <- get_AB_recombs(phased_AB)
   
@@ -418,6 +418,8 @@ main <- function(phasepath, p){
   print(length(unique(phased_beta)))
   
   print(length(unique(phased_AB)))
+  
+  View(table(mismatch_df$INDIVIDUAL))
   
   
 }

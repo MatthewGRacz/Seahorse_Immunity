@@ -11,6 +11,7 @@ library("tidyverse")
 library("rvest")
 library("parallel")
 library("readxl")
+library("mclust")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
@@ -526,9 +527,12 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
+  write_csv(data.frame(RECOMB = names(final_dapc$grp), SUPERTYPE = final_dapc$grp), 
+            paste0(pipeline_path, "dapc5.csv"))
+  
   analyzed_supertypes_df <- get_supertypes(final_dapc)
   #gets supertypes of all recombinants and their population
-  
+
   get_indv_unique_recombs <- function(fish, recombs){
 
     return(recombs[grepl(paste0("^", fish, "_"), names(recombs))])
@@ -676,11 +680,13 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   microbe_taxonomy_data <- read_xlsx(paste0(pipeline_path, "GLMOTUMH_output_MS2FIG6.xlsx"), sheet="p-value for Fig6")
   
-  microbe_taxonomy_data <- invisible(na.omit(data.frame(cbind(MICROBE = microbe_taxonomy_data$OTUs, PHYLUM = microbe_taxonomy_data$Phylum, ORDER = microbe_taxonomy_data$Order, GENUS = microbe_taxonomy_data$Genus))))
+  microbe_taxonomy_data <- na.omit(data.frame(invisible(cbind(MICROBE = microbe_taxonomy_data$OTUs, PHYLUM = microbe_taxonomy_data$Phylum, ORDER = microbe_taxonomy_data$Order, GENUS = microbe_taxonomy_data$Genus))))
   
   
   JLA_MST_data <- JLA_MST_data[JLA_MST_data$SIGNIFICANCE != "", ]
   JLA_MAB_data <- JLA_MAB_data[JLA_MAB_data$SIGNIFICANCE != "", ]
+  MGR_MST_data <- MGR_MST_data[MGR_MST_data$SIGNIFICANCE != "", ]
+  MGR_MAB_data <- MGR_MAB_data[MGR_MAB_data$SIGNIFICANCE != "", ]
   
   JLA_MST_df <- data.frame(
     MICROBE = JLA_MST_data$MICROBE,
@@ -695,10 +701,35 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
     SUPERTYPE = recomb_freqs$SUPERTYPE[match(JLA_MAB_data$ATTRIBUTE, recomb_freqs$UNIQUE_RECOMB)]
   )
   
+  MGR_MST_df <- data.frame(
+    MICROBE = MGR_MST_data$MICROBE,
+    GENUS = microbe_taxonomy_data$GENUS[match(MGR_MST_data$MICROBE, microbe_taxonomy_data$MICROBE)],
+    SUPERTYPE = as.numeric(gsub("S", "", MGR_MST_data$ATTRIBUTE))
+  )
+  
+  MGR_MAB_df <- data.frame(
+    MICROBE = MGR_MAB_data$MICROBE,
+    GENUS = microbe_taxonomy_data$GENUS[match(MGR_MAB_data$MICROBE, microbe_taxonomy_data$MICROBE)],
+    UNIQUE_RECOMB = MGR_MAB_data$ATTRIBUTE,
+    SUPERTYPE = recomb_freqs$SUPERTYPE[match(MGR_MAB_data$ATTRIBUTE, recomb_freqs$UNIQUE_RECOMB)]
+  )
+  
   View(JLA_MST_df)
   View(JLA_MAB_df)
   
+  supertype_mapping <- merge(MGR_MST_df, JLA_MST_df, 
+                             by = "MICROBE", 
+                             suffixes = c("_MGR", "_JLA"))
   
+  View(supertype_mapping)
+  
+  
+  
+
+  View(MGR_MST_df)
+  View(MGR_MAB_df)
+  
+
   
 }
 
