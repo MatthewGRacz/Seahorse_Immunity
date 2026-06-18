@@ -77,7 +77,23 @@ main <- function(phasepath, p){
     outfile <- readLines(outpath) 
     #reads AB outfile
     
-    allele_probs <- outfile[(grep("BEGIN PHASEPROBS", outfile, value=FALSE)+1):(grep("END PHASEPROBS", outfile, value=FALSE)-1)]
+    alleles_by_indv <- outfile[(grep("BEGIN BESTPAIRS_SUMMARY", outfile, value=FALSE)+1):(grep("END BESTPAIRS_SUMMARY", outfile, value=FALSE)-1)]
+    
+    alleles_by_indv <- strsplit(gsub(":", ",", gsub("\\(|\\)", "", gsub(" ", "", alleles_by_indv))), ",")
+    #[1] is name, [2] is allele1 number, [3] is allele2 number
+    
+    master_vector <- (!duplicated(sapply(alleles_by_indv, `[`, 1), fromLast=TRUE))
+    #if any individuals' names appear twice, get the bottom-most one as its position
+    #this maps the allele numbers and confidences in the outfile for the known clones
+    
+    phased_allele_numbers <- c(rbind(as.integer(sapply(alleles_by_indv, `[`, 2))[master_vector], 
+                                     as.integer(sapply(alleles_by_indv, `[`, 3))[master_vector]))
+    
+    phased_allele_freqs <- as.integer(sub(".*\\s+([0-9]+).*$", "\\1", outfile[(grep("BEGIN LIST_SUMMARY", outfile, value=FALSE)+1):(grep("END LIST_SUMMARY", outfile, value=FALSE)-1)]))[phased_allele_numbers]
+    
+    individuals <- sapply(alleles_by_indv, `[`, 1)[master_vector]
+    
+    allele_probs <- (outfile[(grep("BEGIN PHASEPROBS", outfile, value=FALSE)+1):(grep("END PHASEPROBS", outfile, value=FALSE)-1)])[master_vector]
     #gets probabilities of the loci in the AB outfile
     
     allele_probs <- gsub("=", "1.00", allele_probs)
@@ -105,18 +121,10 @@ main <- function(phasepath, p){
       
     })
     
-    alleles_by_indv <- outfile[(grep("BEGIN BESTPAIRS_SUMMARY", outfile, value=FALSE)+1):(grep("END BESTPAIRS_SUMMARY", outfile, value=FALSE)-1)]
-    
-    alleles_by_indv <- strsplit(gsub(":", ",", gsub("\\(|\\)", "", gsub(" ", "", alleles_by_indv))), ",")
-    #[1] is name, [2] is allele1 number, [3] is allele2 number
-    
-    phased_allele_numbers <- c(rbind(as.integer(sapply(alleles_by_indv, `[`, 2)), as.integer(sapply(alleles_by_indv, `[`, 3))))
-    
-    phased_allele_freqs <- as.integer(sub(".*\\s+([0-9]+).*$", "\\1", outfile[(grep("BEGIN LIST_SUMMARY", outfile, value=FALSE)+1):(grep("END LIST_SUMMARY", outfile, value=FALSE)-1)]))[phased_allele_numbers]
     
     input_alleles_data <- data.frame(
       
-      INDIVIDUAL = sapply(alleles_by_indv, `[`, 1),
+      INDIVIDUAL = individuals,
       NUM_LOW_CONFIDENCE = rowSums(allele_probs < p),
       LOW_CONFIDENCE_LOCI = low_conf_loci,
       NUM_LOCI = length(loci_positions),
@@ -128,26 +136,27 @@ main <- function(phasepath, p){
     )
     
     
-    return(list(input_alleles_data, alleles_by_indv, phased_allele_freqs))
+    return(list(input_alleles_data, individuals, phased_allele_freqs))
     
   }
   
   AB_out_data <- get_out_analysis(AB_outpath)
   AB_out_df <- AB_out_data[[1]]
   View(AB_out_df)
-  AB_allele_nums <- c(rbind(as.integer(sapply(AB_out_data[[2]], `[`, 2)), as.integer(sapply(AB_out_data[[2]], `[`, 3))))
+  AB_allele_nums <- AB_out_data[[2]]
   AB_freqs <- AB_out_data[[3]]
   
   alpha_out_data <- get_out_analysis(alpha_outpath)
   alpha_out_df <- alpha_out_data[[1]]
   View(alpha_out_df)
-  alpha_allele_nums <- c(rbind(as.integer(sapply(alpha_out_data[[2]], `[`, 2)), as.integer(sapply(alpha_out_data[[2]], `[`, 3))))
+  #alpha_names <- sapply(alpha_out_data, `[`, 1)[!duplicated(sapply(alpha_out_data, `[`, 1), fromLast=TRUE)]
+  alpha_allele_nums <- alpha_out_data[[2]]
   alpha_freqs <- alpha_out_data[[3]]
   
   beta_out_data <- get_out_analysis(beta_outpath)
   beta_out_df <- beta_out_data[[1]]
   View(beta_out_df)
-  beta_allele_nums <- c(rbind(as.integer(sapply(beta_out_data[[2]], `[`, 2)), as.integer(sapply(beta_out_data[[2]], `[`, 3))))
+  beta_allele_nums <- beta_out_data[[2]]
   beta_freqs <- beta_out_data[[3]]
   
   
@@ -155,32 +164,52 @@ main <- function(phasepath, p){
   phased_alpha <- suppressWarnings(toupper(unlist(read.fasta(paste0(alpha_phasepath, "phased.fasta"), as.string=TRUE))))
   phased_beta <- suppressWarnings(toupper(unlist(read.fasta(paste0(beta_phasepath, "phased.fasta"), as.string=TRUE))))
   
+  phased_AB <- phased_AB[!duplicated(names(phased_AB), fromLast = TRUE)]
+  phased_alpha <- phased_alpha[!duplicated(names(phased_alpha), fromLast = TRUE)]
+  phased_beta  <- phased_beta[!duplicated(names(phased_beta), fromLast = TRUE)]
+  
   unphased_AB <- suppressWarnings(toupper(unlist(read.fasta(paste0(phasepath, "unphased.fasta"), as.string=TRUE))))
   unphased_alpha <- suppressWarnings(toupper(unlist(read.fasta(paste0(alpha_phasepath, "unphased.fasta"), as.string=TRUE))))
   unphased_beta <- suppressWarnings(toupper(unlist(read.fasta(paste0(beta_phasepath, "unphased.fasta"), as.string=TRUE))))
   
-  phased_df <- data.frame(
+  
+  phased_AB_df <- data.frame(
     
-    INDIVIDUAL = rep(sapply(AB_out_data[[2]], `[`, 1), each = 2),
+    INDIVIDUAL = gsub("[ab]$", "", names(phased_AB)),
     
     AB_ALPHA = toupper(substr(phased_AB, 1, 246)),
     AB_BETA = toupper(substr(phased_AB, 247, 519)),
     AB_FREQUENCY = AB_freqs,
     
+    stringsAsFactors = FALSE
+    
+  )
+  
+  phased_alpha_df <- data.frame(
+    
+    INDIVIDUAL = gsub("[ab]$", "", names(phased_alpha)),
+    
     ALPHA = phased_alpha,
     ALPHA_FREQUENCY = alpha_freqs,
+    
+    stringsAsFactors = FALSE
+    
+  )
+  
+  phased_beta_df <- data.frame(
+    
+    INDIVIDUAL = gsub("[ab]$", "", names(phased_beta)),
     
     BETA = phased_beta,
     BETA_FREQUENCY = beta_freqs,
     
     stringsAsFactors = FALSE
     
-    
   )
   
   unphased_df <- data.frame(
     
-    INDIVIDUAL = sapply(AB_out_data[[2]], `[`, 1),
+    INDIVIDUAL = names(unphased_AB),
     UNPHASED_AB = unphased_AB,
     UNPHASED_ALPHA = unphased_alpha,
     UNPHASED_BETA = unphased_beta,
@@ -189,7 +218,14 @@ main <- function(phasepath, p){
     
   )
   
-
+  #in the same order, since no clones messing up the order of the phased alleles
+  
+  
+  phased_df <- do.call(cbind, lapply(list(phased_AB_df, phased_alpha_df, phased_beta_df), function(df) {
+    df[, !names(df) %in% "INDIVIDUAL", drop = FALSE] 
+  }))
+  
+  phased_df <- cbind(INDIVIDUAL = phased_AB_df$INDIVIDUAL, phased_df)
   
   allele_seq_df <- merge(phased_df, unphased_df, by = "INDIVIDUAL", all.x = TRUE, sort = FALSE)
   
@@ -197,9 +233,17 @@ main <- function(phasepath, p){
     "INDIVIDUAL", "UNPHASED_AB", "AB_ALPHA", "AB_BETA", "AB_FREQUENCY", 
     "UNPHASED_ALPHA", "ALPHA", "ALPHA_FREQUENCY", 
     "UNPHASED_BETA", "BETA", "BETA_FREQUENCY" )]
+
   
-  #View(allele_seq_df)
+  View(allele_seq_df)
   
+  get_conf_safe <- function(confs_row, locus_col) {
+    if (locus_col %in% names(confs_row)) {
+      return(unlist(confs_row[, locus_col]))
+    } else {
+      return(1.00)
+    }
+  }
   
   
   get_mismatches <- function(indv, allele_seq_df, ab_col, a_b_col, A_B_sequences, init_index, freq, AB_out_df, A_B_out_df){
@@ -233,10 +277,9 @@ main <- function(phasepath, p){
       
       straight_mismatches <- unique(c(comparison_one, comparison_three))
       crossed_mismatches <- unique(c(comparison_two, comparison_four))
-
       
       
-       
+      
       if(length(straight_mismatches) >= length(crossed_mismatches)){
         
         #comparison two is more parsimonious, use it here
@@ -259,8 +302,8 @@ main <- function(phasepath, p){
             A_B_UNPHASED = a_b_seqs_chars[comparison_two],
             AB_FREQ = indv_data$AB_FREQUENCY[1],
             A_B_FREQ = indv_data[[freq]][2],
-            AB_CONF = unlist(AB_confs[, as.character(comparison_two + init_index)]),
-            A_B_CONF = unlist(A_B_confs[, as.character(comparison_two)]),
+            AB_CONF = sapply(as.character(comparison_two + init_index), function(col) if (col %in% names(AB_confs)) unlist(AB_confs[, col]) else 1.00),
+            A_B_CONF = sapply(as.character(comparison_two), function(col) if (col %in% names(A_B_confs)) unlist(A_B_confs[, col]) else 1.00),
             
             OTHER_SNPS = has_other_snps,
             SECTION = a_b_col,
@@ -274,7 +317,7 @@ main <- function(phasepath, p){
         if(has_other_snps && !(is_empty(comparison_four)) && !(is_empty(comparison_two))){
           
             
-            indv_mismatches <- data.frame(
+          indv_mismatches_snps <- data.frame(
               
               INDIVIDUAL = indv,
               BP = comparison_four,
@@ -284,14 +327,16 @@ main <- function(phasepath, p){
               A_B_UNPHASED = a_b_seqs_chars[comparison_four],
               AB_FREQ = indv_data$AB_FREQUENCY[2],
               A_B_FREQ = indv_data[[freq]][1],
-              AB_CONF = unlist(AB_confs[, as.character(comparison_four + init_index)]),
-              A_B_CONF = unlist(A_B_confs[, as.character(comparison_four)]),
+              AB_CONF = sapply(as.character(comparison_four + init_index), function(col) if (col %in% names(AB_confs)) unlist(AB_confs[, col]) else 1.0),
+              A_B_CONF = sapply(as.character(comparison_four), function(col) if (col %in% names(A_B_confs)) unlist(A_B_confs[, col]) else 1.0),
               OTHER_SNPS = has_other_snps,
               SECTION = a_b_col,
               
               stringsAsFactors = FALSE
               
             )
+          
+          indv_mismatches <- bind_rows(indv_mismatches, indv_mismatches_snps) %>% arrange(BP)
           
         }
         
@@ -319,8 +364,8 @@ main <- function(phasepath, p){
             A_B_UNPHASED = a_b_seqs_chars[comparison_one],
             AB_FREQ = indv_data$AB_FREQUENCY[1],
             A_B_FREQ = indv_data[[freq]][1],
-            AB_CONF = unlist(AB_confs[, as.character(comparison_one + init_index)]),
-            A_B_CONF = unlist(A_B_confs[, as.character(comparison_one)]),
+            AB_CONF = sapply(as.character(comparison_one + init_index), function(col) if (col %in% names(AB_confs)) unlist(AB_confs[, col]) else 1.0),
+            A_B_CONF = sapply(as.character(comparison_one), function(col) if (col %in% names(A_B_confs)) unlist(A_B_confs[, col]) else 1.0),
             OTHER_SNPS = has_other_snps,
             SECTION = a_b_col,
             
@@ -333,9 +378,7 @@ main <- function(phasepath, p){
         
         if(has_other_snps && !(is_empty(comparison_three)) && !(is_empty(comparison_one))){
           
-          
-          
-            indv_mismatches <- data.frame(
+            indv_mismatches_snps <- data.frame(
               
               INDIVIDUAL = indv,
               BP = comparison_three,
@@ -345,14 +388,16 @@ main <- function(phasepath, p){
               A_B_UNPHASED = a_b_seqs_chars[comparison_three], 
               AB_FREQ = indv_data$AB_FREQUENCY[2],
               A_B_FREQ = indv_data[[freq]][2],
-              AB_CONF = unlist(AB_confs[, as.character(comparison_three + init_index)]),
-              A_B_CONF = unlist(A_B_confs[, as.character(comparison_three)]),
+              AB_CONF = sapply(as.character(comparison_three + init_index), function(col) if (col %in% names(AB_confs)) unlist(AB_confs[, col]) else 1.0),
+              A_B_CONF = sapply(as.character(comparison_three), function(col) if (col %in% names(A_B_confs)) unlist(A_B_confs[, col]) else 1.0),
               OTHER_SNPS = has_other_snps,
               SECTION = a_b_col,
               
               stringsAsFactors = FALSE
               
             )
+            
+            indv_mismatches <- bind_rows(indv_mismatches, indv_mismatches_snps) %>% arrange(BP)
           
         }
         
@@ -399,7 +444,8 @@ main <- function(phasepath, p){
     
   }
   
-  mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE, AB_out_df, alpha_out_df), compare_alleles(allele_seq_df, is_alpha=FALSE, AB_out_df, beta_out_df)))
+  mismatch_df <- data.frame(bind_rows(compare_alleles(allele_seq_df, is_alpha=TRUE, AB_out_df, alpha_out_df), 
+                                      compare_alleles(allele_seq_df, is_alpha=FALSE, AB_out_df, beta_out_df)))
   
   rownames(mismatch_df) <- NULL
   
