@@ -65,8 +65,8 @@ get_AB_recombs <- function(phased_AB){
 
 main <- function(phasepath, p){
   
-  alpha_phasepath <- "PHASED/p=0.5/CLONES/PHASE_A_CLONES/"
-  beta_phasepath <- "PHASED/p=0.5/CLONES/PHASE_B_CLONES/"
+  alpha_phasepath <- "PHASED/p=0.5/CLONES/6-24-2026/A_CLONES/"
+  beta_phasepath <- "PHASED/p=0.5/CLONES/6-24-2026/B_CLONES/"
   
   AB_outpath <- paste0(phasepath, "seqphase.out")
   alpha_outpath <- paste0(alpha_phasepath, "seqphase.out")
@@ -451,7 +451,7 @@ main <- function(phasepath, p){
   
   View(mismatch_df)
   
-  write.csv(mismatch_df, "PHASE_pipeline/mismatch_df_againstclones.csv")
+  write.csv(mismatch_df, "PHASE_pipeline/mismatch_df_6-24-2026.csv")
   
   AB_recombs <- get_AB_recombs(phased_AB)
   
@@ -467,11 +467,23 @@ main <- function(phasepath, p){
   
   View(table(mismatch_df$INDIVIDUAL))
   
+  write.csv(alpha_out_df, "ALPHA_CLONES_LOW_CONFIDENCE.csv")
+  write.csv(beta_out_df, "BETA_CLONES_LOW_CONFIDENCE.csv")
+  
+  write.csv(mismatch_df, "ALPHA_BETA_CLONES_ABNOCLONES_MISMATCHES.csv")
+  
+  #AB_out_df <<- AB_out_df
+  
+  #View(table(as.numeric(strsplit(AB_out_df$LOW_CONFIDENCE_LOCI, ", "))))
+  
+  write.csv(allele_seq_df, "alleles_seqs.csv")
+  
+  
   
 }
 
 
-main("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/", 0.7)
+main("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", 0.7)
 
 
 
