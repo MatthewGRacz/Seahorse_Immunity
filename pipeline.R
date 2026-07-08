@@ -12,6 +12,7 @@ library("rvest")
 library("parallel")
 library("readxl")
 library("mclust")
+library("clue")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
@@ -521,17 +522,25 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #get codons of amino acids which are under positive selection in sampled pops
   
   zscores <- get_z_scores(recomb_proteins_pos_sel)
+  zscores <<- zscores
+  View(zscores)
   #makes Z-scores of each immune amino acid into a data frame
   
   final_dapc <- get_dapc_analysis(zscores, 1, pipeline_path)
+  final_dapc <<- final_dapc
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
   
-  write_csv(data.frame(RECOMB = names(final_dapc$grp), SUPERTYPE = final_dapc$grp), 
-            paste0(pipeline_path, "dapc5.csv"))
+  write.csv(data.frame(RECOMB = names(final_dapc$grp), SUPERTYPE = final_dapc$grp), 
+            paste0(pipeline_path, "dapc3.csv"))
   
   analyzed_supertypes_df <- get_supertypes(final_dapc)
+  analyzed_supertypes_df <<- analyzed_supertypes_df
   #gets supertypes of all recombinants and their population
+  
+  View(analyzed_supertypes_df)
+  
+  View(table(final_dapc$grp))
 
   get_indv_unique_recombs <- function(fish, recombs){
 
