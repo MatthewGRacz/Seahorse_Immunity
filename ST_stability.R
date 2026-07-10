@@ -13,7 +13,7 @@ get_dapc_analysis <- function(zscores, num_supertypes, pipeline_path){
                     n.pca=ncol(zscores), 
                     n.da=1000)
     
-  a_spline_data <- optim.a.score(test_dapc, n.sim=1)
+  a_spline_data <- optim.a.score(test_dapc, n.sim=100)
   
   final_dapc <- dapc(zscores, 
                      grp = cluster_data$grp, 
@@ -28,7 +28,7 @@ get_dapc_analysis <- function(zscores, num_supertypes, pipeline_path){
 }
 #gets a DAPC for each run, where it assigns supertypes to the recombinants
 
-num_runs <- 5
+num_runs <- 1001
 
 num_supertypes <- 17
 
@@ -46,7 +46,7 @@ merged_dapc <- data.frame(
 )
 #all of the DAPC supertypes for each recombinant in a massive dataframe
 
-ari_df2 <- data.frame(
+ari_df <- data.frame(
   
   RUN = paste0("RUN_", 2:num_runs),
   
@@ -119,6 +119,6 @@ write_csv(recomb_stabilities, paste0(pipeline_path, "recombinant_stabilities.csv
 
 write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities.csv"))
 
-write_csv(ari_df2, paste0(pipeline_path, "ari_df2.csv"))
+write_csv(ari_df, paste0(pipeline_path, "ari_df.csv"))
 
 

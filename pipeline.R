@@ -58,6 +58,10 @@ get_AB_recombs <- function(AB_phasepath){
   
   AB_alleles <- read.fasta(AB_phasepath, as.string = TRUE)
   
+  AB_alleles <- AB_alleles[!duplicated(names(AB_alleles), fromLast = TRUE)]
+  #KEY! This only looks for the newest AB alleles for each individual, so the cloned known alleles 
+  #are used, and the older, original, potentially-wrong alleles are not used
+  
   indv_names <- unique(gsub("[ab]$", "", names(AB_alleles)))
   #get names of individuals whose sequences you're looking at
   
@@ -471,7 +475,7 @@ get_glm_and_heatmap <- function(pipeline_path,
 
 main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
-  ABphasepath <- "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/"
+  ABphasepath <- "PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/"
   pipeline_path <- "Pipeline/"
   
   #with good alleles, make recombinants (a1b1, a1b2, etc)
@@ -497,6 +501,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
               file.out=paste0(pipeline_path, "recombs.fasta"))
   #FASTA file of recombs
   
+  invisible(readline(prompt = "\nJust created recombinants! Upload the 'recombs.fasta' file to RECCO with 10,000 permutations, savings >=5, and\nalignment p-val<=0.05, and save it as a CSV named 'recco.results.csv' to the Pipeline folder.\nOnce done, press [Enter]!"))
+  
   recombs <- suppressWarnings(remove_recco(recombs, pipeline_path))
   #run RECCO analyses on recombinants
   
@@ -511,6 +517,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
               file.out=paste0(pipeline_path, "recombs_postRECCO.fasta"))
   
   #send post-RECCO alleles to DataMonkey
+  
+  invisible(readline(prompt = "\nFiltered from RECCO! Send 'recombs_postRECCO.fasta.' to Datamonkey's SLAC, FEL, and MEME sites,\nand save the results in the pipeline folder as 'slac.csv', 'meme.json', and 'fel.json'.\nOnce done, press [Enter]!"))
   
   datamonkey_codons <- get_datamonkey(paste0(pipeline_path, "slac.csv"), 
                                       paste0(pipeline_path, "meme.json"), 
@@ -530,9 +538,6 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   final_dapc <<- final_dapc
   #runs cluster analysis, DAPC, and a-score optimization on z-score data for amino acids
   #returns a DAPC with the optimal number of PCs
-  
-  write.csv(data.frame(RECOMB = names(final_dapc$grp), SUPERTYPE = final_dapc$grp), 
-            paste0(pipeline_path, "dapc3.csv"))
   
   analyzed_supertypes_df <- get_supertypes(final_dapc)
   analyzed_supertypes_df <<- analyzed_supertypes_df
@@ -560,7 +565,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   ordered_names <- gsub("^([A-Za-z]+)(\\d+).*$", "\\1W\\2", unlist(strsplit("SI01-15 NP01-17 NP02-17 NP03-17 NP04-17 NP05-17 CC16-17 WE01-15 WE02-15 WE03-15 WE06-17 WE07-17 WE08-17 WE09-17 WE10-17 WE11-17 AK01-15 AK12-17 AK13-17 AK14-17 AK15-17", " ")))
   
-  indv_unique_recombs <- lapply(ordered_names, get_indv_unique_recombs, recombs=read.fasta("/Users/mattracz/Projects/Wilson_Lab/Pipeline/recombs.fasta", as.string=TRUE))
+  indv_unique_recombs <- lapply(ordered_names, get_indv_unique_recombs, recombs=read.fasta(paste0(pipeline_path, "recombs.fasta"), as.string=TRUE))
   #done before RECCO filtering and after TA filtering
   
   write.fasta(as.list(unlist(indv_unique_recombs)), names=names(unlist(indv_unique_recombs)), paste0(pipeline_path, "forFABOX.fasta"))
@@ -568,6 +573,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #print(length(unique(unlist(indv_unique_recombs))))
   
   #FaBox exports results as HTML, convert to CSV and use that file here
+  
+  invisible(readline(prompt = "\nAlmost done! Send the file 'forFABOX.fasta' to FaBox and export its results as an HTML file.\nSend that file to a website to convert it to CSV, then save that file in the pipeline folder\nas 'fabox_results.csv'. Once done, press [Enter]!"))
   
   recomb_freqs <- read.csv(paste0(pipeline_path, "fabox_results.csv"))[, c(2, 3, 5)]
   
@@ -742,6 +749,6 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
 }
 
-main_alleles_to_supertypes("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/", "Pipeline/")
+main_alleles_to_supertypes("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", "Pipeline/")
 
 
