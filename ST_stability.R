@@ -28,7 +28,10 @@ get_dapc_analysis <- function(zscores, num_supertypes, pipeline_path){
 }
 #gets a DAPC for each run, where it assigns supertypes to the recombinants
 
-num_runs <- 1001
+num_runs <- 1200
+
+num_runs <- num_runs + 1
+#run1 for a baseline, the other runs as comparisons
 
 num_supertypes <- 17
 
@@ -84,24 +87,73 @@ jumper_df <- data.frame(RECOMBINANT=merged_dapc[["RECOMBINANT"]],
 #a bit hardcoded, but for a better look
 #assigns names and makes runX have runX's translated supertypes
 
-stabilities <- lapply(jumper_df$RECOMBINANT, function(recomb){
+run_cols <- grep("^RUN_", colnames(jumper_df), value = TRUE)
+run_cols <- run_cols[run_cols != "RUN_1"]
+
+
+jumper_df$STABILITY <- apply(jumper_df[, run_cols], 1, function(recomb_row){
   
-  recomb_data <- as.numeric(jumper_df[jumper_df$RECOMBINANT==recomb, -c(1, 2)])
+  recomb_data <- as.numeric(unlist(recomb_row))
   
-  best_supertype <- as.numeric(names(which.max(table(recomb_data))))
-  
-  return((sum(recomb_data == best_supertype)-1) * 100 / (length(recomb_data)-1))
+  return(100*(max(table(recomb_data))-1)/(length(recomb_data)-1))
   
 })
 
-jumper_df$STABILITY <- as.numeric(unlist(stabilities))
+jumper_df$PREFERENCE <- 100 * (jumper_df$STABILITY - (100/num_supertypes)) / (100-(100/num_supertypes))
+
+jumper_df$INSTABILITY <- 100 - jumper_df$STABILITY
+
 #adds up, out of the total number of runs, the number of runs with the same, most frequent supertype number
 #the minus 1 excludes run1 comparing with itself 
 #this is the optimistic approach, so if run1 was an outlier, and a recombinant is mostly in another supertype, 
 #that supertype is deemed the best-match and therefore the percent of the time that the recombinant is within 
 #the better supertype is counted instead
 
-recomb_stabilities <- data.frame(jumper_df["RECOMBINANT"], jumper_df["INDIVIDUAL"], jumper_df["STABILITY"])
+jumper_df$UNIQUE_STS <- apply(jumper_df[, run_cols], 1, function(recomb_row){
+  
+  return(length(unique(as.numeric(recomb_row))))
+  
+})
+
+jumper_df$EFFECTIVE_STS_HILL_SIMPSON <- apply(jumper_df[, run_cols], 1, function(recomb_row){
+  
+  freq_table <- sort(table(as.numeric(recomb_row))/length(recomb_row), decreasing = TRUE)
+  
+  return(1/(sum((freq_table)^2)))
+  
+})
+
+#Hill Number for species richness using the inverse of the Ginni-Simpson Index
+#Since we assume that dominant supertypes are likely where the recombinant is, and that
+#less-frequent supertypes are likely noise, this one is used
+#The Shannon Hill Number is a bit less exponential, so noise gets weighed more equally
+
+jumper_df$UNEVENNESS <- apply(jumper_df[, run_cols], 1, function(recomb_row){
+  
+  freq_table <- sort(table(as.numeric(recomb_row))/length(recomb_row), decreasing = TRUE)
+  
+  if(max(freq_table) == min(freq_table) || length(freq_table)==1) {return(0)}
+  
+  else{
+    
+    return(sum(abs(diff(freq_table)))*100)
+    
+  }
+  
+})
+
+nonrun_cols <- colnames(jumper_df)[!colnames(jumper_df) %in% run_cols]
+
+jumper_df$NOISE <- jumper_df$UNEVENNESS * jumper_df$UNIQUE_STS / jumper_df$EFFECTIVE_STS_HILL_SIMPSON
+
+jumper_df$NOISE <- jumper_df$NOISE*100/max(jumper_df$NOISE)
+
+#percentage of how much a recombinant travels; 0% is perfect stability, while higher indicates
+#that the recombinant has been looped into a greater number of supertypes overall
+#different from stability, since a recombinant can have 50% stability among 2 supertypes, with a travelling of 20%,
+#or be, among 10 runs, 50% in its most frequent supertype, and 10% among 5 others, hence with a travelling of 50% 
+
+recomb_stabilities <- jumper_df[,nonrun_cols[nonrun_cols != "RUN_1"]]
 #summary stats dataframe, with each recombinant, its individual and its stability, next to each other 
 
 indv_stabilities <- aggregate(STABILITY ~ INDIVIDUAL, data = jumper_df, FUN = function(x) {
@@ -110,7 +162,7 @@ indv_stabilities <- aggregate(STABILITY ~ INDIVIDUAL, data = jumper_df, FUN = fu
     RANGE  = diff(range(x, na.rm = TRUE)))
 })
 
-indv_stabilities <- cbind(indv_stabilities["INDIVIDUAL"], indv_stabilities$STABILITY)
+indv_stabilities <- cbind(indv_stabilities["INDIVIDUAL"], indv_stabilities)
 #gets the median, mean, and range stabilities per individual, for individual-based analyses 
 
 write_csv(jumper_df, paste0(pipeline_path, "jumpers_dataframe.csv"))
@@ -121,4 +173,5 @@ write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities.csv"))
 
 write_csv(ari_df, paste0(pipeline_path, "ari_df.csv"))
 
+GLM_individuals_stabilities <- jumper_df[jumper_df$INDIVIDUAL %in% ordered_names, nonrun_cols]
 

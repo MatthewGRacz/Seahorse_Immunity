@@ -215,7 +215,7 @@ get_dapc_analysis <- function(zscores, num_tests, pipeline_path){
   
   pdf(paste0(pipeline_path,"A_optimization_graph_MGR.pdf"), width = 10, height = 10)
 
-  a_spline_data <- optim.a.score(test_dapc, n.sim=10)
+  a_spline_data <- optim.a.score(test_dapc, n.sim=100)
   #finds the optimal number of principal components
   
   dev.off()
@@ -696,7 +696,10 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   microbe_taxonomy_data <- read_xlsx(paste0(pipeline_path, "GLMOTUMH_output_MS2FIG6.xlsx"), sheet="p-value for Fig6")
   
-  microbe_taxonomy_data <- na.omit(data.frame(invisible(cbind(MICROBE = microbe_taxonomy_data$OTUs, PHYLUM = microbe_taxonomy_data$Phylum, ORDER = microbe_taxonomy_data$Order, GENUS = microbe_taxonomy_data$Genus))))
+  microbe_taxonomy_data <- na.omit(data.frame(invisible(cbind(MICROBE = microbe_taxonomy_data$OTUs, 
+                                                              PHYLUM = microbe_taxonomy_data$Phylum, 
+                                                              ORDER = microbe_taxonomy_data$Order, 
+                                                              GENUS = microbe_taxonomy_data$Genus))))
   
   
   JLA_MST_data <- JLA_MST_data[JLA_MST_data$SIGNIFICANCE != "", ]
