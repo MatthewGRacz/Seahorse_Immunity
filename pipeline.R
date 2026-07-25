@@ -100,7 +100,7 @@ remove_recco <- function(recombs, pipeline_path){
 
 get_translation <- function(recombs){
   
-  recomb_proteins <- lapply(recombs, function(x) {translate(s2c(x))})
+  recomb_proteins <- lapply(recombs, function(x) {seqinr::translate(seqinr::s2c(x))})
   
   return(recomb_proteins[!sapply(recomb_proteins, function(x) "*" %in% x)])
   #if any have a stop codon by chance of such bps being concatenated, filter them out
@@ -508,6 +508,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   recomb_proteins <- get_translation(recombs)
   
+  recomb_proteins <<- recomb_proteins
+  
   recombs <- recombs[names(recombs) %in% names(recomb_proteins)]
   #only include sequences which didn't produce a * (stop codon)
   
@@ -517,6 +519,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
               file.out=paste0(pipeline_path, "recombs_postRECCO.fasta"))
   
   #send post-RECCO alleles to DataMonkey
+  
+  recombs <<- recombs
   
   invisible(readline(prompt = "\nFiltered from RECCO! Send 'recombs_postRECCO.fasta.' to Datamonkey's SLAC, FEL, and MEME sites,\nand save the results in the pipeline folder as 'slac.csv', 'meme.json', and 'fel.json'.\nOnce done, press [Enter]!"))
   
@@ -528,6 +532,8 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   recomb_proteins_pos_sel <- get_pos_sel_proteins(recomb_proteins, datamonkey_codons)
   #get codons of amino acids which are under positive selection in sampled pops
+  
+  recomb_proteins_pos_sel <<- recomb_proteins_pos_sel
   
   zscores <- get_z_scores(recomb_proteins_pos_sel)
   zscores <<- zscores

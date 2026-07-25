@@ -90,6 +90,13 @@ jumper_df <- data.frame(RECOMBINANT=merged_dapc[["RECOMBINANT"]],
 run_cols <- grep("^RUN_", colnames(jumper_df), value = TRUE)
 run_cols <- run_cols[run_cols != "RUN_1"]
 
+jumper_df$BEST <- apply(jumper_df[, run_cols], 1, function(recomb_row){
+  
+  recomb_data <- as.numeric(unlist(recomb_row))
+  
+  return(as.numeric(names(which.max(table(recomb_data)))))
+  
+})
 
 jumper_df$STABILITY <- apply(jumper_df[, run_cols], 1, function(recomb_row){
   
@@ -173,5 +180,33 @@ write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities.csv"))
 
 write_csv(ari_df, paste0(pipeline_path, "ari_df.csv"))
 
-GLM_individuals_stabilities <- jumper_df[jumper_df$INDIVIDUAL %in% ordered_names, nonrun_cols]
+GLM_individuals_data <- jumper_df[jumper_df$INDIVIDUAL %in% ordered_names, ]
+
+fixed_individual_supertype_vector <- +(table(1:17 %in% GLM_individuals_data$BEST[indv_x,]))
+
+microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
+microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
+JLA_individual_supertype_vector <- microbe_attribute_data[!grepl("^M", colnames(microbe_attribute_data))]
+#colname manipulation to add one to each and then pad with 0s the nonexistent ones
+
+JLA_supertypes_col <- lapply(JLA_individual_supertype_vector, function(indv_x){
+  
+  fixed_individual_supertype_vector <- +(table(1:17 %in% GLM_individuals_data$BEST[indv_x,]))
+  #sees if 1:17 is within the best supertypes of this individual
+  #repeats for all individuals used in the microbe analysis
+  
+  translated_supertypes <- as.numeric(solve_LSAP(table(JLA_individual_supertype_vector[indv_x,], fixed_individual_supertype_vector), maximum = TRUE))
+  #compares run1 to runX and puts them into a cross-matrix
+  #feeds that cross-matrix to the Hungarian Algorithm
+  
+  supertype_dictionary <- setNames(1:max(as.numeric(levels(fixed_individual_supertype_vector[indv_x,]))), translated_supertypes)
+  #creates a dictionary based on the Hungarian Algorithm's best supertype numbers match
+  
+  return(as.numeric(supertype_dictionary[as.character(fixed_individual_supertype_vector[indv_x,])]))
+  #translates the supertype numbers from runX into run1-equivalent supertypes
+  #returns the column of runX's supertypes as run1-translated supertype numbers
+  
+})
+
+
 

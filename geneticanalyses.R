@@ -454,6 +454,7 @@ main <- function(phasepath, p){
   write.csv(mismatch_df, "PHASE_pipeline/mismatch_df_6-24-2026.csv")
   
   AB_recombs <- get_AB_recombs(phased_AB)
+  AB_recombs <<- AB_recombs
   
   print(length(unique(AB_recombs)))
   
