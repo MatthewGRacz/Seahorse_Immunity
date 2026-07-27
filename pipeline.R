@@ -90,7 +90,7 @@ remove_recco <- function(recombs, pipeline_path){
   recco_path <- paste0(pipeline_path, "recco_results.csv")
   
   recco_results <- read.delim(recco_path)
-  recco_names <- recco_results$Sequence[recco_results$Aln.pv <= 0.05]
+  recco_names <- recco_results$Sequence[recco_results$`Aln pv` <= 0.05]
   #RECCO's output file is TSV, not CSV like it says
   #where flagged recombinants with p <= 0.05 for sequence alignment are removed
   
@@ -111,19 +111,19 @@ get_datamonkey <- function(slac, meme, fel){
   
   slac <- read.csv(slac)
   
-  slac_sites <- c(slac[slac$"P..dN.dS...1." <= 0.05, ]$"Site")
+  slac_sites <- c(slac[slac$"P..dN.dS...1." <= 0.10, ]$"Site")
   #CSV compresses headers; this corresponds with the positive selection header
   #P [dN/dS > 1]
   
   meme <- fromJSON(meme)$MLE$content$`0`
   #where the data lies
   
-  meme_sites <- c(which(meme[,7] <= 0.05))
+  meme_sites <- c(which(meme[,7] <= 0.10))
   #7th column is p values, and all p values < 0.05 are pos selection
   
   fel <- fromJSON(fel)$MLE$content$`0`
   
-  fel_sites <- c(which(fel[,5] <= 0.05))
+  fel_sites <- c(which(fel[,5] <= 0.10))
   #5th column is p values, and all p values < 0.05 are pos selection
   
   freq_table <- table(c(slac_sites, meme_sites, fel_sites))
@@ -475,9 +475,6 @@ get_glm_and_heatmap <- function(pipeline_path,
 
 main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
-  ABphasepath <- "PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/"
-  pipeline_path <- "Pipeline/"
-  
   #with good alleles, make recombinants (a1b1, a1b2, etc)
   #get FASTA DNA sequences of alleles from PHASED alleles
   #Alpha Alleles and Beta Alleles, glue them together
@@ -501,7 +498,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
               file.out=paste0(pipeline_path, "recombs.fasta"))
   #FASTA file of recombs
   
-  invisible(readline(prompt = "\nJust created recombinants! Upload the 'recombs.fasta' file to RECCO with 10,000 permutations, savings >=5, and\nalignment p-val<=0.05, and save it as a CSV named 'recco.results.csv' to the Pipeline folder.\nOnce done, press [Enter]!"))
+  invisible(readline(prompt = "\nJust created recombinants! Upload the 'recombs.fasta' file to RECCO with 10,000 permutations, savings >=5, and\nalignment p-val<=0.05, and save it as a CSV named 'recco_results.csv' to the Pipeline folder.\nOnce done, press [Enter]!"))
   
   recombs <- suppressWarnings(remove_recco(recombs, pipeline_path))
   #run RECCO analyses on recombinants
@@ -757,7 +754,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
 
   
 }
-
-main_alleles_to_supertypes("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", "Pipeline/")
+      
+main_alleles_to_supertypes("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", "Pipeline/AB_62426/")
 
 
