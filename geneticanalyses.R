@@ -63,10 +63,7 @@ get_AB_recombs <- function(phased_AB){
   
 }
 
-main <- function(phasepath, p){
-  
-  alpha_phasepath <- "PHASED/p=0.5/CLONES/6-24-2026/A_CLONES/"
-  beta_phasepath <- "PHASED/p=0.5/CLONES/6-24-2026/B_CLONES/"
+main <- function(phasepath, alpha_phasepath, beta_phasepath, p){
   
   AB_outpath <- paste0(phasepath, "seqphase.out")
   alpha_outpath <- paste0(alpha_phasepath, "seqphase.out")
@@ -449,6 +446,8 @@ main <- function(phasepath, p){
   
   rownames(mismatch_df) <- NULL
   
+  mismatch_df <<- mismatch_df
+  
   View(mismatch_df)
   
   write.csv(mismatch_df, "PHASE_pipeline/mismatch_df_6-24-2026.csv")
@@ -484,9 +483,9 @@ main <- function(phasepath, p){
 }
 
 
-main("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", 0.7)
-
-
+main("PHASED/p=0.5/CLONES/7-27-2026/AB_CLONES/",   
+     "PHASED/p=0.5/CLONES/7-27-2026/A_CLONES/", 
+     "PHASED/p=0.5/CLONES/7-27-2026/B_CLONES/", 0.70)
 
 
 
