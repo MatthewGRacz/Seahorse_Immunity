@@ -2,7 +2,8 @@ library("clue")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
-pipleine_path <- "Pipeline/AB_NOCLONES/"
+pipleine_path <- "Pipeline/AB_72726/"
+
 
 get_dapc_analysis <- function(zscores, num_supertypes, pipeline_path){
   
@@ -199,7 +200,7 @@ GS_OG_individuals_data <- as.matrix(GS_OG_individuals_data)
 #as a translator/dictionary for newer datasets; new data STs --> old data STs --> JLA STs
 #this standardizes every heatmap and hence comparable 1:1 with any filterings/modifications to them
 
-GLM_recomb_jumper_df <- read.csv("Pipeline/AB_62426/jumpers_dataframe.csv")
+GLM_recomb_jumper_df <- read.csv(paste0 (pipeline_path, "jumpers_dataframe.csv"))
 
 GLM_recombs_data <- jumper_df[jumper_df$INDIVIDUAL %in% ordered_names, ]
 

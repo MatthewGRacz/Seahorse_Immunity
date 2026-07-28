@@ -535,6 +535,9 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   zscores <- get_z_scores(recomb_proteins_pos_sel)
   zscores <<- zscores
   View(zscores)
+  
+  write.csv(zscores, paste0(pipeline_path, "zscores.csv"))
+  
   #makes Z-scores of each immune amino acid into a data frame
   
   final_dapc <- get_dapc_analysis(zscores, 1, pipeline_path)
@@ -595,7 +598,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   rownames(recomb_freqs) <- NULL
   
-  recomb_freqs <- recomb_freqs
+  recomb_freqs <<- recomb_freqs
   
   #View(recomb_freqs)
   
@@ -697,7 +700,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #of their supertypes with these supertypes, allows us to see if JLA had good judgement 
   #in her chapter 4 experiment of which microbes she picked and for what supertype of captive seahorse
   
-  microbe_taxonomy_data <- read_xlsx(paste0(pipeline_path, "GLMOTUMH_output_MS2FIG6.xlsx"), sheet="p-value for Fig6")
+  microbe_taxonomy_data <- read_xlsx("Pipeline/GLMOTUMH_output_MS2FIG6.xlsx", sheet="p-value for Fig6")
   
   microbe_taxonomy_data <- na.omit(data.frame(invisible(cbind(MICROBE = microbe_taxonomy_data$OTUs, 
                                                               PHYLUM = microbe_taxonomy_data$Phylum, 
@@ -754,7 +757,6 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
 
   
 }
-      
-main_alleles_to_supertypes("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", "Pipeline/AB_62426/")
 
+main_alleles_to_supertypes("PHASED/p=0.5/CLONES/7-27-2026/AB_CLONES/", "Pipeline/AB_72726/")
 

@@ -1,4 +1,4 @@
-pipeline_path <- "Pipeline/"
+pipeline_path <- "Pipeline/AB_62426/"
 
 microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
 microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
