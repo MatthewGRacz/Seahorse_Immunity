@@ -450,7 +450,7 @@ main <- function(phasepath, alpha_phasepath, beta_phasepath, p){
   
   View(mismatch_df)
   
-  write.csv(mismatch_df, "PHASE_pipeline/mismatch_df_6-24-2026.csv")
+  write.csv(mismatch_df, paste0(pipeline_path, "mismatch_df.csv"))
   
   AB_recombs <- get_AB_recombs(phased_AB)
   AB_recombs <<- AB_recombs
@@ -472,7 +472,7 @@ main <- function(phasepath, alpha_phasepath, beta_phasepath, p){
   
   write.csv(mismatch_df, "ALPHA_BETA_CLONES_ABNOCLONES_MISMATCHES.csv")
   
-  #AB_out_df <<- AB_out_df
+  AB_out_df <<- AB_out_df
   
   #View(table(as.numeric(strsplit(AB_out_df$LOW_CONFIDENCE_LOCI, ", "))))
   

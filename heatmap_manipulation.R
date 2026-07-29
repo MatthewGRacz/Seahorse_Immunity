@@ -5,13 +5,14 @@ pipeline_path <- "Pipeline/AB_62426/"
 
 
 zscores <- read.csv(paste0(pipeline_path, "zscores.csv"))
+zscores <- column_to_rownames(zscores, "X")
 zscores <<- zscores
 
 JLA_microbes <- c('M0008', 'M0003', 'M0006', 'M0016', 'M0044', 'M0018', 'M0061', 'M0081', 'M0031', 'M0014', 'M0012', 'M0007', 'M0015', 'M0019', 'M0011', 'M0005', 'M0010', 'M0030', 'M0041', 'M0085', 'M0029', 'M0020', 'M0048', 'M0013', 'M0002', 'M0004', 'M0023', 'M0032', 'M0064', 'M0001', 'M0017', 'M0009')
 #microbes JLA used for Ch 3 heatmap, in the order she has them from bottom up (how the heatmap automatically names the y-axis)
 
 
-GS_OG_jumper_df <- read.csv("Pipeline/AB_NOCLONES/jumpers_dataframe.csv")
+GS_OG_jumper_df <- read.csv("Pipeline/AB_NOCLONES/jumpers_dataframe_500.csv")
 
 GS_OG_recombs_data <- GS_OG_jumper_df[GS_OG_jumper_df$INDIVIDUAL %in% ordered_names, ]
 
@@ -29,53 +30,73 @@ GS_OG_individuals_data <- as.matrix(GS_OG_individuals_data)
 #as a translator/dictionary for newer datasets; new data STs --> old data STs --> JLA STs
 #this standardizes every heatmap and hence comparable 1:1 with any filterings/modifications to them
 
-GLM_recomb_jumper_df <- read.csv(paste0(pipeline_path, "jumpers_dataframe.csv"))
+GLM_recomb_jumper_df <- read.csv(paste0(pipeline_path, "jumpers_dataframe_200.csv"))
 
 GLM_recombs_data <- GLM_recomb_jumper_df[GLM_recomb_jumper_df$INDIVIDUAL %in% ordered_names, ]
 
-GLM_individuals_data <- table(GLM_recombs_data$INDIVIDUAL,factor(GLM_recombs_data$BEST, levels = 1:17))
+GLM_individuals_data <- table(GLM_recombs_data$INDIVIDUAL, factor(GLM_recombs_data$BEST, levels = 1:17))
 
 colnames(GLM_individuals_data) <- sprintf("S%02d", 0:16)
 
 GLM_individuals_data <- GLM_individuals_data[ordered_names,]
-GLM_individuals_data <- as.matrix(GLM_individuals_data)
+GLM_individuals_data <- unclass(GLM_individuals_data)
+class(GLM_individuals_data) <- "matrix"
 
 
 microbe_attribute_data <- read.csv(paste0("/Users/mattracz/Projects/Wilson_Lab/Pipeline/GLMOTUSTv2.csv"))
 microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
 JLA_matrix <- microbe_attribute_data[!grepl("^M", colnames(microbe_attribute_data))]
 microbe_attribute_data <- microbe_attribute_data[!grepl("^S", colnames(microbe_attribute_data))]
-
-JLA_matrix[,setdiff(colnames(GLM_individuals_data), colnames(JLA_matrix))] <- 0
-
-JLA_matrix <- JLA_matrix[, colnames(GLM_individuals_data)]
 JLA_matrix <- as.matrix(JLA_matrix)
-#pad nonexistent supertypes with 0s and arranges supertypes in the correct order
 
-OG_JLA_overlap_matrix <- t(GS_OG_individuals_data) %*% JLA_matrix
+#JLA's matrix of 14 supertypes is used to assign GS supertypes their JLA equiva;ent
+#for the 3 other supertypes, we don't know any information on their assignments, and 
+#the Hungarian Algo scrambles them so severely that heatmaps become guesses and not 1:1
+#by keeping it as 14 and allowing those 3 unknown supertypes to not have a JLA equivalent,
+#it ensures consistency among DAPC-stabilized assignments for all GLM data
+#basically, use what you actually know, guess nothing!
+
+OG_JLA_overlap_matrix <- t(JLA_matrix) %*% GS_OG_individuals_data
 #dot product of JLA's presence/absence matrix and my OG supertype assignments
 #this builds a dictionary where I can first translate any supertype assignments to the
 #ones used in the GS that JLA originally had, then I can take those assignments and translate
 #them to JLA's used supertypes, hence standardizing the supertypes of all heatmaps used in the future
 
-OG_to_JLA_dictionary <- setNames(colnames(JLA_matrix)[as.numeric(solve_LSAP(OG_JLA_overlap_matrix, maximum = TRUE))], colnames(GS_OG_individuals_data))
+OG_to_JLA_dictionary <- setNames(rownames(OG_JLA_overlap_matrix), colnames(GS_OG_individuals_data)[as.numeric(solve_LSAP(OG_JLA_overlap_matrix, maximum = TRUE))])
+#sets the names of the GS supertypes to the JLA supertype numbers
+#hence, input of a GS supertype returns the JLA supertype label
 
+unanchored_GS <- setdiff(colnames(GS_OG_individuals_data), names(OG_to_JLA_dictionary))
+#whichever 3 GS supertypes are not in the dictionary as inputs, which used JLA's matrix of 14 supertypes,
+#are hence the supertypes which were not assigned to any JLA supertype
+#these ones are unassigned/unanchored, and hence when translated from GS to JLA, return NA (or 0 for my analysis)
+
+zero_OG <- names(which(colSums(GS_OG_individuals_data) == 0))
+zero_OG  # inspect - should show S05, S06, S09, S16 (or whatever your current run gives)
 
 OG_GLM_overlap_matrix <- t(GLM_individuals_data) %*% GS_OG_individuals_data
+OG_GLM_overlap_reduced <- OG_GLM_overlap_matrix[, !colnames(OG_GLM_overlap_matrix) %in% zero_OG]
+# now 17 GLM rows x (17 - length(zero_OG)) GS_OG columns
 
-GLM_to_OG_dictionary <- setNames(colnames(GS_OG_individuals_data)[as.numeric(solve_LSAP(OG_GLM_overlap_matrix, maximum = TRUE))],colnames(GLM_individuals_data))
+# solve_LSAP needs nrow <= ncol, so transpose since GLM (17) > reduced GS_OG columns now
+GLM_to_OG_assignment <- solve_LSAP(t(OG_GLM_overlap_reduced), maximum = TRUE)
+# length = ncol(OG_GLM_overlap_reduced), one match per remaining GS_OG supertype -> best GLM row
+
+GLM_to_OG_dictionary <- setNames(rownames(OG_GLM_overlap_reduced)[as.numeric(GLM_to_OG_assignment)],
+                                 colnames(OG_GLM_overlap_reduced))
+
+
+
 
 
 GLM_to_JLA_dictionary <- setNames(OG_to_JLA_dictionary[GLM_to_OG_dictionary], names(GLM_to_OG_dictionary))
 
 
-
-colnames(GLM_individuals_data) <- GLM_to_JLA_dictionary[colnames(GLM_individuals_data)] 
+colnames(GLM_individuals_data) <- GLM_to_JLA_dictionary[colnames(GLM_individuals_data)]
+GLM_individuals_data <- GLM_individuals_data[, !is.na(colnames(GLM_individuals_data))]
 #align column names as they're fed into the dictionary and translated
 
-GLM_individuals_data <- GLM_individuals_data[, colnames(JLA_matrix)]
-
-GLM_individuals_data <- +(GLM_individuals_data[, colnames(JLA_matrix)] > 0)
+GLM_individuals_data <- +(GLM_individuals_data > 0)
 #presence/absence vector of supertype presence per recombinants of those individuals; 
 #the GLM is quasibinomial and hence operates based off these, instead of by quantity 
 
@@ -85,10 +106,10 @@ class(GLM_individuals_data) <- "matrix"
 #casts it as a matrix, rids of all table features, to support different GLM types and
 #prevent errors when cbinding onto the microbe_attribute_data
 
-microbe_attribute_data <- cbind(microbe_attribute_data, GLM_individuals_data[rownames(microbe_attribute_data), ])
+microbe_attribute_data <- cbind(microbe_attribute_data, as.data.frame(GLM_individuals_data[rownames(microbe_attribute_data), ]))
 #add the translated presence/absence vector to the microbe_attribute data, which is then fed into the GLM function
 
-
+#as.data.frame(GLM_individuals_data[rownames(microbe_attribute_data), ])
 
 get_glm_and_heatmap <- function(pipeline_path, 
                                 microbe_attribute_data, 
@@ -198,7 +219,8 @@ get_glm_and_heatmap <- function(pipeline_path,
                                 geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 4, vjust = 0.7)  +
                                 scale_color_manual(values = c("TRUE" = "white", "FALSE" = "black"), guide = "none") +
                                 scale_fill_gradient2(
-                                  low = "white", mid="#A6A6A6", high = "black", 
+                                  #low = "white", mid="#A6A6A6", high = "black", 
+                                  low = "blue", mid="hotpink", high = "#ff0026", 
                                   midpoint=mid_z,
                                   limits = c(min_z, max_z),
                                   breaks = c(min_z, max_z),
@@ -240,7 +262,7 @@ JLA_MST_data <- get_glm_and_heatmap(pipeline_path,
                                     0.3)
 
 #write_csv(JLA_MST_data, paste0(pipeline_path, "Microbe_Supertype_GLM_data_QUASIPOISSON.csv"))
-write_csv(JLA_MST_data, paste0(pipeline_path, "Microbe_Supertype_GLM_data.csv"))
+#write_csv(JLA_MST_data, paste0(pipeline_path, "Microbe_Supertype_GLM_data.csv"))
 
 
 

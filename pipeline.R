@@ -758,5 +758,6 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
 }
 
-main_alleles_to_supertypes("PHASED/p=0.5/CLONES/7-27-2026/AB_CLONES/", "Pipeline/AB_72726/")
-
+main_alleles_to_supertypes("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", "Pipeline/AB_62426/")
+#main_alleles_to_supertypes("PHASED/p=0.5/CLONES/7-27-2026/AB_CLONES/", "Pipeline/AB_72726/")
+main_alleles_to_supertypes("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/", "Pipeline/AB_NOCLONES/")

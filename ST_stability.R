@@ -2,10 +2,16 @@ library("clue")
 
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
-pipleine_path <- "Pipeline/AB_72726/"
+#pipeline_path <- "Pipeline/AB_NOCLONES/"
+pipeline_path <- "Pipeline/AB_62426/"
+#pipeline_path <- "Pipeline/AB_72726/"
+
+zscores <- read.csv(paste0(pipeline_path, "zscores.csv"))
+zscores <- column_to_rownames(zscores, "X")
+zscores <<- zscores
 
 
-get_dapc_analysis <- function(zscores, num_supertypes, pipeline_path){
+get_dapc_analysis <- function(zscores, num_supertypes){
   
   cluster_data <- find.clusters(zscores, 
                                 n.clust=num_supertypes,
@@ -40,7 +46,7 @@ num_supertypes <- 17
 
 cat("\nRunning DAPC analyses... This may take a moment...")
 
-results <- replicate(num_runs, get_dapc_analysis(zscores, num_supertypes, pipeline_path), simplify = FALSE)
+results <- replicate(num_runs, get_dapc_analysis(zscores, num_supertypes), simplify = FALSE)
 #run num_supertypes many DAPC analyses
 
 merged_dapc <- data.frame(
@@ -182,7 +188,7 @@ write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities.csv"))
 
 write_csv(ari_df, paste0(pipeline_path, "ari_df.csv"))
 
-GS_OG_jumper_df <- read.csv("Pipeline/AB_NOCLONES/jumpers_dataframe.csv")
+GS_OG_jumper_df <- read.csv("Pipeline/AB_NOCLONES/jumpers_dataframe_500.csv")
 
 GS_OG_recombs_data <- GS_OG_jumper_df[GS_OG_jumper_df$INDIVIDUAL %in% ordered_names, ]
 
@@ -200,7 +206,7 @@ GS_OG_individuals_data <- as.matrix(GS_OG_individuals_data)
 #as a translator/dictionary for newer datasets; new data STs --> old data STs --> JLA STs
 #this standardizes every heatmap and hence comparable 1:1 with any filterings/modifications to them
 
-GLM_recomb_jumper_df <- read.csv(paste0 (pipeline_path, "jumpers_dataframe.csv"))
+GLM_recomb_jumper_df <- read.csv(paste0 (pipeline_path, "jumpers_dataframe_500.csv"))
 
 GLM_recombs_data <- jumper_df[jumper_df$INDIVIDUAL %in% ordered_names, ]
 
