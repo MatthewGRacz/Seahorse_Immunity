@@ -464,6 +464,7 @@ main <- function(phasepath, alpha_phasepath, beta_phasepath, p){
   print(length(unique(phased_beta)))
   
   print(length(unique(phased_AB)))
+  print(length(unique(phased_AB[!grepl("^TA", names(phased_AB))])))
   
   View(table(mismatch_df$INDIVIDUAL))
   
@@ -488,7 +489,14 @@ main("PHASED/p=0.5/CLONES/7-27-2026/AB_CLONES/",
      "PHASED/p=0.5/CLONES/7-27-2026/B_CLONES/", 0.70)
 
 
+main("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/",   
+     "PHASED/p=0.5/CLONES/6-24-2026/A_CLONES/", 
+     "PHASED/p=0.5/CLONES/6-24-2026/B_CLONES/", 0.70)
 
+
+main("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/",   
+     "PHASED/p=0.5/NO_CLONES/PHASE_A_NOCLONES/", 
+     "PHASED/p=0.5/NO_CLONES/PHASE_B_NOCLONES/", 0.70)
 
 
 

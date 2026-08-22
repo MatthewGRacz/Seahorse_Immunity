@@ -3,8 +3,11 @@ library("clue")
 setwd("/Users/mattracz/Projects/Wilson_Lab")
 
 #pipeline_path <- "Pipeline/AB_NOCLONES/"
-pipeline_path <- "Pipeline/AB_62426/"
-#pipeline_path <- "Pipeline/AB_72726/"
+#pipeline_path <- "Pipeline/AB_62426/"
+pipeline_path <- "Pipeline/AB_72726/"
+pipeline_path <- "Pipeline/AB_NOCLONES/CP/"
+pipeline_path <- "Pipeline/AB_62426/CP/"
+pipeline_path <- "Pipeline/AB_72726/CP/"
 
 zscores <- read.csv(paste0(pipeline_path, "zscores.csv"))
 zscores <- column_to_rownames(zscores, "X")
@@ -37,7 +40,7 @@ get_dapc_analysis <- function(zscores, num_supertypes){
 }
 #gets a DAPC for each run, where it assigns supertypes to the recombinants
 
-num_runs <- 500
+num_runs <- 1200
 
 num_runs <- num_runs + 1
 #run1 for a baseline, the other runs as comparisons
@@ -180,13 +183,13 @@ indv_stabilities <- aggregate(STABILITY ~ INDIVIDUAL, data = jumper_df, FUN = fu
 
 indv_stabilities <- do.call(data.frame, indv_stabilities)
 
-write_csv(jumper_df, paste0(pipeline_path, "jumpers_dataframe.csv"))
+write_csv(jumper_df, paste0(pipeline_path, "jumpers_dataframe_1200.csv"))
 
-write_csv(recomb_stabilities, paste0(pipeline_path, "recombinant_stabilities.csv"))
+write_csv(recomb_stabilities, paste0(pipeline_path, "recombinant_stabilities_1200.csv"))
 
-write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities.csv"))
+write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities_1200.csv"))
 
-write_csv(ari_df, paste0(pipeline_path, "ari_df.csv"))
+write_csv(ari_df, paste0(pipeline_path, "ari_df_1200.csv"))
 
 GS_OG_jumper_df <- read.csv("Pipeline/AB_NOCLONES/jumpers_dataframe_500.csv")
 

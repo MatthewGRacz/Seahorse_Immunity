@@ -3,3 +3,5 @@
 .RData
 .Ruserdata
 testcomps.R
+.RDataTmp*
+*.RData

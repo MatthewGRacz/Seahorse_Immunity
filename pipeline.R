@@ -90,7 +90,7 @@ remove_recco <- function(recombs, pipeline_path){
   recco_path <- paste0(pipeline_path, "recco_results.csv")
   
   recco_results <- read.delim(recco_path)
-  recco_names <- recco_results$Sequence[recco_results$`Aln pv` <= 0.05]
+  recco_names <- recco_results$Sequence[recco_results$`Aln.pv` <= 0.05]
   #RECCO's output file is TSV, not CSV like it says
   #where flagged recombinants with p <= 0.05 for sequence alignment are removed
   
@@ -111,19 +111,19 @@ get_datamonkey <- function(slac, meme, fel){
   
   slac <- read.csv(slac)
   
-  slac_sites <- c(slac[slac$"P..dN.dS...1." <= 0.10, ]$"Site")
+  slac_sites <- c(slac[slac$"P..dN.dS...1." <= 0.05, ]$"Site")
   #CSV compresses headers; this corresponds with the positive selection header
   #P [dN/dS > 1]
   
   meme <- fromJSON(meme)$MLE$content$`0`
   #where the data lies
   
-  meme_sites <- c(which(meme[,7] <= 0.10))
+  meme_sites <- c(which(meme[,7] <= 0.05))
   #7th column is p values, and all p values < 0.05 are pos selection
   
   fel <- fromJSON(fel)$MLE$content$`0`
   
-  fel_sites <- c(which(fel[,5] <= 0.10))
+  fel_sites <- c(which(fel[,5] <= 0.05))
   #5th column is p values, and all p values < 0.05 are pos selection
   
   freq_table <- table(c(slac_sites, meme_sites, fel_sites))
@@ -441,6 +441,9 @@ get_glm_and_heatmap <- function(pipeline_path,
   max_z <- max(GLMresults$WALDZ, na.rm = TRUE)
   mid_z <- (min_z + max_z)/2
   
+  print(min_z)
+  print(max_z)
+  
   heatmap <- suppressWarnings(ggplot(GLMresults, aes(x = paste0(ATTRIBUTE, "\n",  attribute_freqs[ATTRIBUTE]), y = MICROBE, fill = WALDZ)) +
     geom_tile(color = "black", size=0.4) +
     geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 4, vjust = 0.7)  +
@@ -504,7 +507,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   #run RECCO analyses on recombinants
   
   recomb_proteins <- get_translation(recombs)
-  
+
   recomb_proteins <<- recomb_proteins
   
   recombs <- recombs[names(recombs) %in% names(recomb_proteins)]
@@ -565,7 +568,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
       
   }
   
-  microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
+  microbe_attribute_data <- read.csv("/Users/mattracz/Projects/Wilson_Lab/Pipeline/GLMOTUSTv2.csv")
   microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
   microbe_data <- microbe_attribute_data[, grep(x = colnames(microbe_attribute_data), pattern = "^M", value=TRUE)]
   
@@ -584,15 +587,30 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   recomb_freqs <- read.csv(paste0(pipeline_path, "fabox_results.csv"))[, c(2, 3, 5)]
   
-  colnames(recomb_freqs) <- c("UNIQUE_RECOMB", "FREQ", "RECOMB")
+  colnames(recomb_freqs) <- c("UNIQUE_RECOMBINANT", "FREQ", "RECOMBINANT")
   
-  recomb_freqs$UNIQUE_RECOMB <- sprintf("AB%03d", as.numeric(recomb_freqs$UNIQUE_RECOMB))
+  recomb_freqs$UNIQUE_RECOMBINANT <- sprintf("AB%03d", as.numeric(recomb_freqs$UNIQUE_RECOMBINANT))
   
-  recomb_freqs <- separate_rows(recomb_freqs, RECOMB, sep = "\n")
+  recomb_freqs <- separate_rows(recomb_freqs, RECOMBINANT, sep = "\n")
   
-  recomb_freqs <- cbind(recomb_freqs, SUPERTYPE = data.frame(final_dapc$grp)[c(recomb_freqs$RECOMB) , ])
+  jumpers_dapc <- data.frame(read.csv(paste0(pipeline_path, "jumpers_dataframe_1200.csv")))[,c("RECOMBINANT", "BEST", "STABILITY")]
   
-  recomb_freqs <- cbind(recomb_freqs, data.frame(INDIVIDUAL = gsub("_.*", "", recomb_freqs$RECOMB)))
+  jumpers_dapc <- jumpers_dapc[jumpers_dapc$RECOMBINANT %in% recomb_freqs$RECOMBINANT, ]
+  
+  recomb_freqs$INDIVIDUAL <- gsub("_.*", "", recomb_freqs$RECOMBINANT)
+  
+  ST_AB <- merge(recomb_freqs, jumpers_dapc, "RECOMBINANT")
+  View(ST_AB)
+  
+  ST_AB <<- ST_AB
+  
+  write.csv(ST_AB, paste0(pipeline_path, "ST_AB.csv"))
+  
+  #recomb_freqs <- cbind(recomb_freqs, SUPERTYPE = data.frame(jumpers_dapc$BEST)[jumpers_dapc$RECOMBINANT %in% recomb_freqs$RECOMBINANT, ])
+  
+  recomb_freqs <- cbind(recomb_freqs, data.frame(INDIVIDUAL = gsub("_.*", "", recomb_freqs$RECOMBINANT)))
+  
+  recomb_freqs <- cbind(recomb_freqs, microbe_data[recomb_freqs$INDIVIDUAL, ])
   
   recomb_freqs <- cbind(recomb_freqs, microbe_data[recomb_freqs$INDIVIDUAL, ])
   
@@ -600,7 +618,11 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
   recomb_freqs <<- recomb_freqs
   
-  #View(recomb_freqs)
+  View(recomb_freqs)
+  
+  recomb_freqs_nomicrobes <- recomb_freqs[, -(grep(x = colnames(recomb_freqs), pattern = "^M"))]
+  
+  View(recomb_freqs_nomicrobes)
   
   JLA_microbes <- c('M0008', 'M0003', 'M0006', 'M0016', 'M0044', 'M0018', 'M0061', 'M0081', 'M0031', 'M0014', 'M0012', 'M0007', 'M0015', 'M0019', 'M0011', 'M0005', 'M0010', 'M0030', 'M0041', 'M0085', 'M0029', 'M0020', 'M0048', 'M0013', 'M0002', 'M0004', 'M0023', 'M0032', 'M0064', 'M0001', 'M0017', 'M0009')
   #microbes JLA used for Ch 3 heatmap, in the order she has them from bottom up (how the heatmap automatically names the y-axis)
@@ -683,7 +705,7 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
                       "Unique Recombinant", 
                       attribute_data, 
                       attribute_freqs, 
-                      "MGR Microbe–Unique Recombinant Associations for All Microbes", 
+                      "Microbe–AB Group Associations for JLA's 32 Microbes", 
                       "MGR_UniqueRecombinant_Microbe_WaldZ_Heatmap",
                       0.3,
                       0.3)
@@ -758,6 +780,6 @@ main_alleles_to_supertypes <- function(ABphasepath, pipeline_path){
   
 }
 
-main_alleles_to_supertypes("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", "Pipeline/AB_62426/")
+#main_alleles_to_supertypes("PHASED/p=0.5/CLONES/6-24-2026/AB_CLONES/", "Pipeline/AB_62426/")
 #main_alleles_to_supertypes("PHASED/p=0.5/CLONES/7-27-2026/AB_CLONES/", "Pipeline/AB_72726/")
 main_alleles_to_supertypes("PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/", "Pipeline/AB_NOCLONES/")
