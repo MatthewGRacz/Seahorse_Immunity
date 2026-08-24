@@ -315,6 +315,22 @@ get_jumpers <- function(pipeline_path, zscores, num_runs, num_supertypes){
   
   jumper_df$NOISE <- jumper_df$NOISE*100/max(jumper_df$NOISE)
   
+  
+  jumper_df$NOISE2 <- apply(jumper_df[, run_cols], 1, function(recomb_row){
+    
+    freq_table <- sort(table(as.numeric(recomb_row))/length(recomb_row), decreasing = TRUE)
+    
+    noise <- sum(freq_table - min(freq_table)) * (1 - max(freq_table))
+    
+    return(noise)
+    
+  })
+  
+  jumper_df$NOISE2 <- jumper_df$NOISE2*100/max(jumper_df$NOISE2)
+  
+  jumper_df$NOISE3 <- (jumper_df$NOISE * jumper_df$NOISE2)
+  jumper_df$NOISE3 <- jumper_df$NOISE3*100/max(jumper_df$NOISE3)
+  
   #percentage of how much a recombinant travels; 0% is perfect stability, while higher indicates
   #that the recombinant has been looped into a greater number of supertypes overall
   #different from stability, since a recombinant can have 50% stability among 2 supertypes, with a travelling of 20%,
@@ -331,18 +347,24 @@ get_jumpers <- function(pipeline_path, zscores, num_runs, num_supertypes){
   
   indv_stabilities <- do.call(data.frame, indv_stabilities)
   
-  write_csv(jumper_df, paste0(pipeline_path, "jumpers_dataframe_1200.csv"))
+  write_csv(jumper_df, paste0(pipeline_path, "jumpers_dataframe.csv"))
   
-  write_csv(recomb_stabilities, paste0(pipeline_path, "recombinant_stabilities_1200.csv"))
+  write_csv(recomb_stabilities, paste0(pipeline_path, "recombinant_stabilities.csv"))
   
-  write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities_1200.csv"))
+  write_csv(indv_stabilities, paste0(pipeline_path, "individual_stabilities.csv"))
   
-  write_csv(ari_df, paste0(pipeline_path, "ari_df_1200.csv"))
+  write_csv(ari_df, paste0(pipeline_path, "ari_df.csv"))
 
 }
 
 #runs the 1200 DAPCs, or however many, using the Hungarian Algorithm to keep the supertype numbers consistent throughout
 #also calculates stability, noise, number of unique supertypes, Simpson-Hill Index, etc per recombinant
+
+filter_jumpers <- function(jumpers){
+  
+  
+  
+}
 
 get_selection_site_seq <- function(recombs, codon_positions) {
   sapply(recombs, function(seq) {
@@ -370,12 +392,12 @@ get_captive_supertypes <- function(pipeline_path, CP_pipeline_path, recombs, CP_
   
   CP_recomb_selection_seqs <- get_selection_site_seq(CP_recombs, datamonkey_codons)
   
-  ST_AB_CP <- read.csv(paste0(CP_pipeline_path, "recombinant_stabilities_1200.csv"))
+  ST_AB_CP <- read.csv(paste0(CP_pipeline_path, "recombinant_stabilities.csv"))
   ST_AB_CP <- ST_AB_CP[,c("RECOMBINANT", "INDIVIDUAL", "BEST")]
   ST_AB_CP$PROTEIN <- get_translation(CP_recomb_selection_seqs)[match(ST_AB_CP$RECOMBINANT, names(CP_recomb_selection_seqs))]
   ST_AB_CP$PROTEIN <- gsub("[^A-Z]", "", ST_AB_CP$PROTEIN)
   
-  jumpers <- read.csv(paste0(pipeline_path, "jumpers_dataframe_1200.csv"))
+  jumpers <- read.csv(paste0(pipeline_path, "jumpers_dataframe.csv"))
   
   parent_supertypes <- as.factor(jumpers$BEST[match(rownames(zscores), jumpers$RECOMBINANT)])
   
@@ -428,10 +450,7 @@ analyze_fabox <- function(pipeline_path){
 get_MST_data <- function(jumpers, ordered_names){
 
 
-  microbe_data <- read.csv("Pipeline/GLMOTUSTv2.csv")
-  microbe_data <- column_to_rownames(microbe_data, "FISH")
-  JLA_matrix <- microbe_data[!grepl("^M", colnames(microbe_data))]
-  microbe_data <- microbe_data[!grepl("^S", colnames(microbe_data))]
+  JLA_matrix <- microbe_attribute_data[!grepl("^M", colnames(microbe_attribute_data))]
   JLA_matrix <- as.matrix(JLA_matrix)
   
   gut_supertypes <- jumpers[jumpers$INDIVIDUAL %in% ordered_names, ]
@@ -443,10 +462,8 @@ get_MST_data <- function(jumpers, ordered_names){
   ST_matrix <- unclass(ST_matrix)
   class(ST_matrix) <- "matrix"
   
-  microbe_attribute_data <- cbind(microbe_data, as.data.frame(ST_matrix))
-  JLA_microbe_attribute_data <- cbind(microbe_data, as.data.frame(JLA_matrix))
   
-  return(list(microbe_attribute_data, JLA_microbe_attribute_data))
+  return(list(JLA_matrix, ST_matrix))
 
 }
 
@@ -467,39 +484,20 @@ get_JLA_codons <- function(){
 
 
 get_glm_and_heatmap_STM <- function(pipeline_path, 
-                                microbe_attribute_data, 
+                                microbe_data, 
                                 JLA_microbes,
-                                attribute_symbol, 
                                 attribute_name, 
                                 attribute_data, 
-                                attribute_freqs, 
                                 heatmap_title, 
-                                heatmap_file_name, 
                                 x_scale,
                                 y_scale){
   
-  attribute_symbol <- paste0("^", attribute_symbol)
-  #for regular expression (regex) functions
-  
-  microbe_data <- microbe_attribute_data[, colnames(microbe_attribute_data) %in% JLA_microbes]
+
+  microbe_data <- microbe_data[, colnames(microbe_data) %in% JLA_microbes]
   #microbe data is the same for the G and H (Microbe vs Supertype and Microbe vs Unique_Recombinant)
   
   attribute_data <- attribute_data[rownames(microbe_data), , drop = FALSE]
-  #puts it in the same order as JLA
-  
-  if(is.null(attribute_data)){
-    
-    #set as NULL for JLA, since her data contains the logical vectors of presence/absence 
-    #of individuals' recombinants in supertypes or unique_recombs or whatever other attribute
-    #we can only know the abundance of my attribute, since JLA's frequencies are not available
-    #and her logical vector can make it so an individual with 4 recombs all of one attribute 
-    #get condensed to a 1 for that attribute, thereby losing data
-    
-    attribute_data <- microbe_attribute_data[, grep(x = colnames(microbe_attribute_data), pattern = attribute_symbol, value=TRUE)]
-    
-    #this gets the columns of logical vectors for presence/absence for that attribute by individual
-    
-  }
+  #puts microbe names in the same order as JLA's heatmap
   
   microbe_attribute_combos <- setNames(
     expand.grid(colnames(microbe_data), 
@@ -571,10 +569,8 @@ get_glm_and_heatmap_STM <- function(pipeline_path,
   
   heatmap <- suppressWarnings(ggplot(GLMresults, aes(x = paste0(ATTRIBUTE, "\n",  attribute_freqs[ATTRIBUTE]), y = MICROBE, fill = WALDZ)) +
                                 geom_tile(color = "black", size=0.4) +
-                                geom_text(aes(label = SIGNIFICANCE, color = WALDZ > mid_z), size = 4, vjust = 0.7)  +
-                                scale_color_manual(values = c("TRUE" = "white", "FALSE" = "white"), guide = "none") +
+                                geom_text(aes(label = SIGNIFICANCE), color = "white", size = 4, vjust = 0.7) +
                                 scale_fill_gradient2(
-                                  #low = "white", mid="#A6A6A6", high = "black", 
                                   low = "blue", mid="hotpink", high = "#ff0026", 
                                   midpoint=mid_z,
                                   limits = c(min_z, max_z),
@@ -594,8 +590,7 @@ get_glm_and_heatmap_STM <- function(pipeline_path,
                                 ) +
                                 labs(title = heatmap_title, x = attribute_name , y = "Microbe"))
   
-  #suppressWarnings(ggsave(paste0(pipeline_path, heatmap_file_name, ".pdf"), plot = heatmap, width = x_scale * length(unique(GLMresults$ATTRIBUTE)), height = num_microbes * y_scale, limitsize = FALSE))
-  
+
   print(heatmap)
   
   return(GLMresults)
@@ -625,39 +620,20 @@ get_MAB_data <- function(recomb_freqs){
 
 
 get_glm_and_heatmap_MAB <- function(pipeline_path, 
-                                microbe_attribute_data, 
+                                    microbe_data, 
                                 JLA_microbes,
-                                attribute_symbol, 
                                 attribute_name, 
                                 attribute_data, 
                                 attribute_freqs, 
                                 heatmap_title, 
-                                heatmap_file_name, 
                                 x_scale,
                                 y_scale){
   
-  attribute_symbol <- paste0("^", attribute_symbol)
-  #for regular expression (regex) functions
-  
-  microbe_data <- microbe_attribute_data[, colnames(microbe_attribute_data) %in% JLA_microbes]
+  microbe_data <- microbe_data[, colnames(microbe_data) %in% JLA_microbes]
   #microbe data is the same for the G and H (Microbe vs Supertype and Microbe vs Unique_Recombinant)
   
   attribute_data <- attribute_data[rownames(microbe_data), , drop = FALSE]
-  #puts it in the same order as JLA
-  
-  if(is.null(attribute_data)){
-    
-    #set as NULL for JLA, since her data contains the logical vectors of presence/absence 
-    #of individuals' recombinants in supertypes or unique_recombs or whatever other attribute
-    #we can only know the abundance of my attribute, since JLA's frequencies are not available
-    #and her logical vector can make it so an individual with 4 recombs all of one attribute 
-    #get condensed to a 1 for that attribute, thereby losing data
-    
-    attribute_data <- microbe_attribute_data[, grep(x = colnames(microbe_attribute_data), pattern = attribute_symbol, value=TRUE)]
-    
-    #this gets the columns of logical vectors for presence/absence for that attribute by individual
-    
-  }
+  #puts microbe names in the same order as JLA's heatmaps
   
   microbe_attribute_combos <- setNames(
     expand.grid(colnames(microbe_data), 
@@ -752,8 +728,6 @@ get_glm_and_heatmap_MAB <- function(pipeline_path,
                                 ) +
                                 labs(title = heatmap_title, x = attribute_name , y = "Microbe"))
   
-  #suppressWarnings(ggsave(paste0(pipeline_path, heatmap_file_name, ".pdf"), plot = heatmap, width = x_scale * length(unique(GLMresults$ATTRIBUTE)), height = num_microbes * y_scale, limitsize = FALSE))
-  
   print(heatmap)
   
   return(GLMresults)
@@ -847,9 +821,11 @@ alleles_to_zscores <- function(ABphasepath, pipeline_path, is_CP){
   
 }
 
-get_shared_captives <- function(ST_AB_CP, MST_data){
+get_shared_captives <- function(ST_AB_CP, ST_matrix){
   
   #see how many captives in $TRANSLATED_BEST share significant supertypes 
+  
+  return(table(factor(ST_AB_CP$TRANSLATED_BEST, factor = colnames(ST_matrix))))
   
 }
 
@@ -899,18 +875,31 @@ main(){
   JLA_codons <- get_JLA_codons()
   #use instead of datamonkey_codons for any analysis, preferably on the GS, for comparing results
   
+  microbe_attribute_data <- read.csv("Pipeline/GLMOTUSTv2.csv")
+  microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
+  microbe_data <- microbe_attribute_data[!grepl("^S", colnames(microbe_attribute_data))]
+  
+  get_jumpers(pipeline_path, zscores, 1200, 17)
+  #about 17-20 seconds per DAPC for 650ish sequences (GS dataset)
+  #180-212 runs/hour, so 1200 runs is about 6 hours
+  #500 runs is a bit over 2 hours
+  
+  jumpers <- read.csv(paste0(pipeline_path, "jumpers_dataframe.csv"))
+  
+  jumpers <- filter_jumpers(jumpers)
+  #filter based on noise, stability, etc
+  
   MST_prep_data <- get_MST_data(jumpers, ordered_names)
   
-  microbe_ST_data <- MST_prep_data[1]
-  JLA_microbe_ST_data <- MST_prep_data[2]
+  JLA_matrix <- MST_prep_data[1]
+  ST_matrix <- MST_prep_data[2]
   
   MST_data <- get_glm_and_heatmap_STM(pipeline_path, 
-                                      microbe_ST_data, 
+                                      microbe_data, 
                                       JLA_microbes,
                                       "S", 
                                       "Supertype", 
-                                      NULL, 
-                                      NULL, 
+                                      ST_matrix,
                                       "Microbe–Supertype Associations", 
                                       "JLA_Supertype_Microbe_WaldZ_Heatmap",
                                       0.3,
@@ -918,12 +907,11 @@ main(){
   
   
   JLA_MST_data <- get_glm_and_heatmap_STM(pipeline_path, 
-                                          JLA_microbe_ST_data, 
+                                          microbe_data, 
                                           JLA_microbes,
                                           "S", 
                                           "Supertype", 
-                                          NULL, 
-                                          NULL, 
+                                          JLA_matrix,
                                           "JLA Microbe–Supertype Associations", 
                                           "JLA_Supertype_Microbe_WaldZ_Heatmap",
                                           0.3,
@@ -936,36 +924,30 @@ main(){
   attribute_data <- MAB_prep_data[3]
   attribute_freqs <- MAB_prep_data[4]
   
-  microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUMH-021521.csv"))
-  microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
-  #I think it can just use microbe data by itself and pastes the AB matrix onto it; double-check
   
-  
-  MAB_data <- get_glm_and_heatmap(pipeline_path, 
-                                  microbe_attribute_data, 
+  MAB_data <- get_glm_and_heatmap_MAB(pipeline_path, 
+                                      microbe_data, 
                                   JLA_microbes, 
                                   "AB", 
                                   "Unique Recombinant", 
                                   attribute_data, 
                                   attribute_freqs, 
                                   "Microbe–AB Group Associations for JLA's 32 Microbes", 
-                                  "MGR_UniqueRecombinant_Microbe_WaldZ_Heatmap",
                                   0.3,
                                   0.3)
   
-  JLA_MAB_data <- get_glm_and_heatmap(pipeline_path, 
-                                      microbe_attribute_data, 
+  JLA_MAB_data <- get_glm_and_heatmap_MAB(pipeline_path, 
+                                          microbe_data, 
                                       JLA_microbes, 
                                       "AB", 
                                       "Unique Recombinant", 
                                       JLA_attribute_data, 
                                       JLA_attribute_freqs,
-                                      "JLA Microbe–Unique Recombinant Associations for All Microbes", 
-                                      "JLA_UniqueRecombinant_Microbe_WaldZ_Heatmap",
+                                      "JLA Microbe–AB Group Associations for JLA's 32 Microbes", 
                                       0.3,
                                       0.3)
   
-  
+  captives_per_supertype <- get_shared_captives(ST_AB_CP, ST_matrix)
   
   
 }
