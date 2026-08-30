@@ -195,7 +195,7 @@ get_jumpers <- function(pipeline_path, zscores, num_runs, num_supertypes){
 
   num_runs <- num_runs + 1
   
-  cat("\nRunning DAPC analyses... This may take a moment...")
+  cat("\nRunning DAPC analyses... This may take several hours...")
   
   results <- replicate(num_runs, get_dapc_analysis(zscores, num_supertypes), simplify = FALSE)
   #run num_supertypes many DAPC analyses
@@ -331,6 +331,41 @@ get_jumpers <- function(pipeline_path, zscores, num_runs, num_supertypes){
   jumper_df$NOISE3 <- (jumper_df$NOISE * jumper_df$NOISE2)
   jumper_df$NOISE3 <- jumper_df$NOISE3*100/max(jumper_df$NOISE3)
   
+  jumper_df$NOISE4 <- jumper_df$UNIQUE_STS / (jumper_df$EFFECTIVE_STS_HILL_SIMPSON * jumper_df$STABILITY)
+  
+  jumper_df$NOISE4 <- jumper_df$NOISE4*100/max(jumper_df$NOISE4)
+  
+  jumper_df$NOISE5 <- apply(jumper_df[, run_cols], 1, function(recomb_row){
+    
+    freq_table <- table(as.numeric(recomb_row)) / length(recomb_row)
+    
+    freq_table <- pmax(freq_table - (1/num_supertypes), 0)
+    
+    return(sum(freq_table > 0))   #num unique above chance (1/num_supertypes)
+    
+  })
+  
+  jumper_df$NOISE5 <- jumper_df$NOISE5/jumper_df$EFFECTIVE_STS_HILL_SIMPSON
+  
+  jumper_df$NOISE6 <- apply(jumper_df[, run_cols], 1, function(recomb_row){
+    
+    freq_table <- table(as.numeric(recomb_row)) / length(recomb_row)
+    
+    freq_table <- pmax(freq_table - (1/num_supertypes), 0)
+    #all assignment proportions below random chance are removed and floored to 0
+    
+    freq_table <- freq_table * (1/sum(freq_table))
+    #normalizes it to 100%
+    
+    return(sum(freq_table > 0) / (1/(sum((freq_table)^2))))
+    
+  })
+  
+  jumper_df$NOISE7 <- jumper_df$NOISE6/jumper_df$NOISE5
+  
+  jumper_df$NOISE5 <- jumper_df$NOISE5*100/max(jumper_df$NOISE5)
+  jumper_df$NOISE6 <- jumper_df$NOISE6*100/max(jumper_df$NOISE6)
+  
   #percentage of how much a recombinant travels; 0% is perfect stability, while higher indicates
   #that the recombinant has been looped into a greater number of supertypes overall
   #different from stability, since a recombinant can have 50% stability among 2 supertypes, with a travelling of 20%,
@@ -360,9 +395,9 @@ get_jumpers <- function(pipeline_path, zscores, num_runs, num_supertypes){
 #runs the 1200 DAPCs, or however many, using the Hungarian Algorithm to keep the supertype numbers consistent throughout
 #also calculates stability, noise, number of unique supertypes, Simpson-Hill Index, etc per recombinant
 
-filter_jumpers <- function(jumpers){
+filter_jumpers <- function(jumpers, max_noise){
   
-  
+  return(jumpers[jumpers$NOISE6 <= max_noise, ])
   
 }
 
@@ -832,9 +867,9 @@ get_shared_captives <- function(ST_AB_CP, ST_matrix){
 
 #clean up heatmap functions
 
-main(){
+main <- function(pipeline_path, AB_phasepath){
   
-  pipeline_path <- "Pipeline/AB_NOCLONES/"
+  pipeline_path <- "Pipeline2/AB_NOCLONES/"
   AB_phasepath <- "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/"
   
   AB_data <- alleles_to_zscores(AB_phasepath, pipeline_path, FALSE)
@@ -886,8 +921,9 @@ main(){
   
   jumpers <- read.csv(paste0(pipeline_path, "jumpers_dataframe.csv"))
   
-  jumpers <- filter_jumpers(jumpers)
+  jumpers <- filter_jumpers(jumpers, 95)
   #filter based on noise, stability, etc
+  #max_noise set to 95
   
   MST_prep_data <- get_MST_data(jumpers, ordered_names)
   
@@ -951,4 +987,6 @@ main(){
   
   
 }
+
+main("Pipeline2/AB_NOCLONES/", "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/")
 
