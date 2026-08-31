@@ -873,7 +873,7 @@ get_shared_captives <- function(ST_AB_CP, ST_matrix){
 main <- function(pipeline_path, AB_phasepath){
   
   pipeline_path <- "Pipeline2/AB_NOCLONES/"
-  AB_phasepath <- "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/"
+  AB_phasepath <- "PHASED/p=0.5/NO_CLONES/AB_NOCLONES/"
   
   AB_data <- alleles_to_zscores(AB_phasepath, pipeline_path, FALSE)
   zscores <- AB_data[[1]]
@@ -881,7 +881,7 @@ main <- function(pipeline_path, AB_phasepath){
   datamonkey_codons <- AB_data[[3]]
   
   CP_pipeline_path <- paste0(pipeline_path, "CP/")
-  CP_AB_phasepath <- paste0(AB_phasepath, "CP/")
+  CP_AB_phasepath <- gsub("NO_CLONES", "CP", AB_phasepath)
   
   CP_data <- alleles_to_zscores(CP_AB_phasepath, CP_pipeline_path, TRUE)
   CP_zscores <- CP_data[[1]]
@@ -980,5 +980,5 @@ main <- function(pipeline_path, AB_phasepath){
   
 }
 
-main("Pipeline2/AB_NOCLONES/", "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/")
+main("Pipeline2/AB_NOCLONES/", "PHASED/p=0.5/NO_CLONES/AB_NOCLONES/")
 
