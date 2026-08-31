@@ -221,7 +221,7 @@ get_jumpers <- function(pipeline_path, zscores, num_runs, num_supertypes){
   )
   #puts into a dataframe the ARI for each run's DAPC compared to run1's 
   
-  comparison_cols <- colnames(merged_dapc)[colnames(merged_dapc) != c("RECOMBINANT", "RUN_1")]
+  comparison_cols <- colnames(merged_dapc)[!colnames(merged_dapc) %in% c("RECOMBINANT", "RUN_1")]
   #the columns that run1's supertype numbers are compared to, to form the supertype dictionary
   
   translated_cols <- lapply(comparison_cols, function(col_x){
@@ -451,7 +451,7 @@ get_captive_supertypes <- function(pipeline_path, CP_pipeline_path, recombs, CP_
 
 }
 
-analyze_fabox <- function(pipeline_path){
+analyze_fabox <- function(pipeline_path, jumpers){
 
   recomb_freqs <- read.csv(paste0(pipeline_path, "fabox_results.csv"))[, c(2, 3, 5)]
   #AB groups
@@ -474,16 +474,16 @@ analyze_fabox <- function(pipeline_path){
   
   recomb_freqs <- cbind(recomb_freqs, data.frame(INDIVIDUAL = gsub("_.*", "", recomb_freqs$RECOMBINANT)))
   
-  recomb_freqs <- cbind(recomb_freqs, microbe_data[recomb_freqs$INDIVIDUAL, ])
-  
   rownames(recomb_freqs) <- NULL
   
   return(recomb_freqs)
 
 }
 
-get_MST_data <- function(jumpers, ordered_names){
+get_MST_data <- function(pipeline_path, jumpers, ordered_names){
 
+  microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
+  microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
 
   JLA_matrix <- microbe_attribute_data[!grepl("^M", colnames(microbe_attribute_data))]
   JLA_matrix <- as.matrix(JLA_matrix)
@@ -602,7 +602,7 @@ get_glm_and_heatmap_STM <- function(pipeline_path,
   max_z <- max(GLMresults$WALDZ, na.rm = TRUE)
   mid_z <- (min_z + max_z)/2
   
-  heatmap <- suppressWarnings(ggplot(GLMresults, aes(x = paste0(ATTRIBUTE, "\n",  attribute_freqs[ATTRIBUTE]), y = MICROBE, fill = WALDZ)) +
+  heatmap <- suppressWarnings(ggplot(GLMresults, aes(x = ATTRIBUTE, y = MICROBE, fill = WALDZ)) +
                                 geom_tile(color = "black", size=0.4) +
                                 geom_text(aes(label = SIGNIFICANCE), color = "white", size = 4, vjust = 0.7) +
                                 scale_fill_gradient2(
@@ -633,9 +633,9 @@ get_glm_and_heatmap_STM <- function(pipeline_path,
 }
 
 
-get_MAB_data <- function(recomb_freqs){
+get_MAB_data <- function(pipeline_path, recomb_freqs){
   
-  microbe_attribute_data_MAB <- read.csv("Pipeline/GLMOTUMH-021521.csv")
+  microbe_attribute_data_MAB <- read.csv(paste0(pipeline_path, "GLMOTUMH-021521.csv"))
   microbe_attribute_data_MAB <- column_to_rownames(microbe_attribute_data_MAB, "FISH")
   #microbe data is the same for the G and H (Microbe vs Supertype and Microbe vs Unique_Recombinant)
   
@@ -850,7 +850,10 @@ alleles_to_zscores <- function(ABphasepath, pipeline_path, is_CP){
   
   write.csv(zscores, paste0(pipeline_path, "zscores.csv"))
   
-  get_jumpers(pipeline_path, zscores, num_runs, num_supertypes)
+  get_jumpers(pipeline_path, zscores, 1200, 17)
+  #about 17-20 seconds per DAPC for 650ish sequences (GS dataset)
+  #180-212 runs/hour, so 1200 runs is about 6 hours
+  #500 runs is a bit over 2 hours
   
   return(list(zscores, recombs, datamonkey_codons))
   
@@ -860,7 +863,7 @@ get_shared_captives <- function(ST_AB_CP, ST_matrix){
   
   #see how many captives in $TRANSLATED_BEST share significant supertypes 
   
-  return(table(factor(ST_AB_CP$TRANSLATED_BEST, factor = colnames(ST_matrix))))
+  return(table(factor(ST_AB_CP$TRANSLATED_BEST, levels = colnames(ST_matrix))))
   
 }
 
@@ -873,16 +876,16 @@ main <- function(pipeline_path, AB_phasepath){
   AB_phasepath <- "PHASED/p=0.5/NO_CLONES/PHASE_AB_NOCLONES/"
   
   AB_data <- alleles_to_zscores(AB_phasepath, pipeline_path, FALSE)
-  zscores <- AB_data[1]
-  recombs <- AB_data[2]
-  datamonkey_codons <- AB_data[3]
+  zscores <- AB_data[[1]]
+  recombs <- AB_data[[2]]
+  datamonkey_codons <- AB_data[[3]]
   
   CP_pipeline_path <- paste0(pipeline_path, "CP/")
   CP_AB_phasepath <- paste0(AB_phasepath, "CP/")
   
   CP_data <- alleles_to_zscores(CP_AB_phasepath, CP_pipeline_path, TRUE)
-  CP_zscores <- CP_data[1]
-  CP_recombs <- CP_data[2]
+  CP_zscores <- CP_data[[1]]
+  CP_recombs <- CP_data[[2]]
   
   ST_AB_CP <- get_captive_supertypes(pipeline_path, CP_pipeline_path, recombs, CP_recombs, datamonkey_codons, zscores)
   
@@ -903,41 +906,34 @@ main <- function(pipeline_path, AB_phasepath){
   
   #FaBox exports results as HTML, convert to CSV and use that file here
   
-  invisible(readline(prompt = "\nAlmost done! Send the file 'forFABOX.fasta' to FaBox and export its results as an HTML file.\nSend that file to a website to convert it to CSV, then save that file in the pipeline folder\nas 'fabox_results.csv'. Once done, press [Enter]!"))
+  jumpers <- read.csv(paste0(pipeline_path, "jumpers_dataframe.csv"))
   
-  recomb_freqs <- analyze_fabox(pipeline_path)
-  
-  JLA_codons <- get_JLA_codons()
-  #use instead of datamonkey_codons for any analysis, preferably on the GS, for comparing results
-  
-  microbe_attribute_data <- read.csv("Pipeline/GLMOTUSTv2.csv")
+  microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
   microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
   microbe_data <- microbe_attribute_data[!grepl("^S", colnames(microbe_attribute_data))]
   
-  get_jumpers(pipeline_path, zscores, 1200, 17)
-  #about 17-20 seconds per DAPC for 650ish sequences (GS dataset)
-  #180-212 runs/hour, so 1200 runs is about 6 hours
-  #500 runs is a bit over 2 hours
+  invisible(readline(prompt = "\nAlmost done! Send the file 'forFABOX.fasta' to FaBox and export its results as an HTML file.\nSend that file to a website to convert it to CSV, then save that file in the pipeline folder\nas 'fabox_results.csv'. Once done, press [Enter]!"))
   
-  jumpers <- read.csv(paste0(pipeline_path, "jumpers_dataframe.csv"))
+  recomb_freqs <- analyze_fabox(pipeline_path, jumpers)
+  
+  JLA_codons <- get_JLA_codons()
+  #use instead of datamonkey_codons for any analysis, preferably on the GS, for comparing results
   
   jumpers <- filter_jumpers(jumpers, 95)
   #filter based on noise, stability, etc
   #max_noise set to 95
   
-  MST_prep_data <- get_MST_data(jumpers, ordered_names)
+  MST_prep_data <- get_MST_data(pipeline_path, jumpers, ordered_names)
   
-  JLA_matrix <- MST_prep_data[1]
-  ST_matrix <- MST_prep_data[2]
+  JLA_matrix <- MST_prep_data[[1]]
+  ST_matrix <- MST_prep_data[[2]]
   
   MST_data <- get_glm_and_heatmap_STM(pipeline_path, 
                                       microbe_data, 
                                       JLA_microbes,
-                                      "S", 
                                       "Supertype", 
                                       ST_matrix,
                                       "Microbe–Supertype Associations", 
-                                      "JLA_Supertype_Microbe_WaldZ_Heatmap",
                                       0.3,
                                       0.3)
   
@@ -945,26 +941,23 @@ main <- function(pipeline_path, AB_phasepath){
   JLA_MST_data <- get_glm_and_heatmap_STM(pipeline_path, 
                                           microbe_data, 
                                           JLA_microbes,
-                                          "S", 
                                           "Supertype", 
                                           JLA_matrix,
                                           "JLA Microbe–Supertype Associations", 
-                                          "JLA_Supertype_Microbe_WaldZ_Heatmap",
                                           0.3,
                                           0.3)
   
-  MAB_prep_data <- get_MAB_data(recomb_freqs)
+  MAB_prep_data <- get_MAB_data(pipeline_path, recomb_freqs)
   
-  JLA_attribute_data <- MAB_prep_data[1]
-  JLA_attribute_freqs <- MAB_prep_data[2]
-  attribute_data <- MAB_prep_data[3]
-  attribute_freqs <- MAB_prep_data[4]
+  JLA_attribute_data <- MAB_prep_data[[1]]
+  JLA_attribute_freqs <- MAB_prep_data[[2]]
+  attribute_data <- MAB_prep_data[[3]]
+  attribute_freqs <- MAB_prep_data[[4]]
   
   
   MAB_data <- get_glm_and_heatmap_MAB(pipeline_path, 
                                       microbe_data, 
                                   JLA_microbes, 
-                                  "AB", 
                                   "Unique Recombinant", 
                                   attribute_data, 
                                   attribute_freqs, 
@@ -975,7 +968,6 @@ main <- function(pipeline_path, AB_phasepath){
   JLA_MAB_data <- get_glm_and_heatmap_MAB(pipeline_path, 
                                           microbe_data, 
                                       JLA_microbes, 
-                                      "AB", 
                                       "Unique Recombinant", 
                                       JLA_attribute_data, 
                                       JLA_attribute_freqs,
