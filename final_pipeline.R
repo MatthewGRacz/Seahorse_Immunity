@@ -485,11 +485,11 @@ get_MST_data <- function(pipeline_path, jumpers, ordered_names){
   microbe_attribute_data <- read.csv(paste0(pipeline_path, "GLMOTUSTv2.csv"))
   microbe_attribute_data <- column_to_rownames(microbe_attribute_data, "FISH")
 
-  JLA_matrix <- microbe_attribute_data[!grepl("^M", colnames(microbe_attribute_data))]
+  JLA_matrix <- microbe_attribute_data[, grep("^S", colnames(microbe_attribute_data), value = TRUE)]
   JLA_matrix <- as.matrix(JLA_matrix)
   
   gut_supertypes <- jumpers[jumpers$INDIVIDUAL %in% ordered_names, ]
-  #filter based on noise here!
+  
   ST_matrix <- table(gut_supertypes$INDIVIDUAL, factor(gut_supertypes$BEST, levels = 1:17))
   colnames(ST_matrix) <- sprintf("S%02d", 0:16)
   ST_matrix <- ST_matrix[ordered_names,]
@@ -642,7 +642,7 @@ get_MAB_data <- function(pipeline_path, recomb_freqs){
   JLA_attribute_data <- microbe_attribute_data_MAB[, grep(x = colnames(microbe_attribute_data_MAB), pattern = "^AB", value=TRUE)]
   JLA_attribute_freqs <- colSums(JLA_attribute_data)
   
-  attribute_data <- +(table(recomb_freqs[, c("INDIVIDUAL", "UNIQUE_RECOMB")]) > 0) 
+  attribute_data <- +(table(recomb_freqs[, c("INDIVIDUAL", "UNIQUE_RECOMBINANT")]) > 0) 
   #logical vectors of if a unique_recomb is present or not per individual
   #also, recomb_freqs already named the unique_recombs with the AB03d format, so no need for renaming
   
@@ -915,13 +915,11 @@ main <- function(pipeline_path, AB_phasepath){
   invisible(readline(prompt = "\nAlmost done! Send the file 'forFABOX.fasta' to FaBox and export its results as an HTML file.\nSend that file to a website to convert it to CSV, then save that file in the pipeline folder\nas 'fabox_results.csv'. Once done, press [Enter]!"))
   
   recomb_freqs <- analyze_fabox(pipeline_path, jumpers)
+  #with all jumpers used, before noise filtering
   
   JLA_codons <- get_JLA_codons()
   #use instead of datamonkey_codons for any analysis, preferably on the GS, for comparing results
   
-  jumpers <- filter_jumpers(jumpers, 95)
-  #filter based on noise, stability, etc
-  #max_noise set to 95
   
   MST_prep_data <- get_MST_data(pipeline_path, jumpers, ordered_names)
   
@@ -946,6 +944,80 @@ main <- function(pipeline_path, AB_phasepath){
                                           "JLA Microbe–Supertype Associations", 
                                           0.3,
                                           0.3)
+  
+  jumpers <- filter_jumpers(jumpers, 95)
+  #filter based on noise, stability, etc
+  #max_noise set to 95
+  
+  MST_prep_data <- get_MST_data(pipeline_path, jumpers, ordered_names)
+  
+  JLA_matrix <- MST_prep_data[[1]]
+  ST_matrix <- MST_prep_data[[2]]
+  
+  MST_data_95 <- get_glm_and_heatmap_STM(pipeline_path, 
+                                      microbe_data, 
+                                      JLA_microbes,
+                                      "Supertype", 
+                                      ST_matrix,
+                                      "Microbe–Supertype Associations Noise <= 95", 
+                                      0.3,
+                                      0.3)
+  
+  jumpers <- filter_jumpers(jumpers, 90)
+  #filter based on noise, stability, etc
+  #max_noise set to 90
+  
+  MST_prep_data <- get_MST_data(pipeline_path, jumpers, ordered_names)
+  
+  JLA_matrix <- MST_prep_data[[1]]
+  ST_matrix <- MST_prep_data[[2]]
+  
+  MST_data_90 <- get_glm_and_heatmap_STM(pipeline_path, 
+                                      microbe_data, 
+                                      JLA_microbes,
+                                      "Supertype", 
+                                      ST_matrix,
+                                      "Microbe–Supertype Associations Noise <= 90", 
+                                      0.3,
+                                      0.3)
+  
+  jumpers <- filter_jumpers(jumpers, 85)
+  #filter based on noise, stability, etc
+  #max_noise set to 85
+  
+  MST_prep_data <- get_MST_data(pipeline_path, jumpers, ordered_names)
+  
+  JLA_matrix <- MST_prep_data[[1]]
+  ST_matrix <- MST_prep_data[[2]]
+  
+  MST_data_85 <- get_glm_and_heatmap_STM(pipeline_path, 
+                                         microbe_data, 
+                                         JLA_microbes,
+                                         "Supertype", 
+                                         ST_matrix,
+                                         "Microbe–Supertype Associations Noise <= 85", 
+                                         0.3,
+                                         0.3)
+  
+  jumpers <- filter_jumpers(jumpers, 80)
+  #filter based on noise, stability, etc
+  #max_noise set to 80
+  
+  MST_prep_data <- get_MST_data(pipeline_path, jumpers, ordered_names)
+  
+  JLA_matrix <- MST_prep_data[[1]]
+  ST_matrix <- MST_prep_data[[2]]
+  
+  MST_data_80 <- get_glm_and_heatmap_STM(pipeline_path, 
+                                         microbe_data, 
+                                         JLA_microbes,
+                                         "Supertype", 
+                                         ST_matrix,
+                                         "Microbe–Supertype Associations Noise <= 80", 
+                                         0.3,
+                                         0.3)
+  
+  
   
   MAB_prep_data <- get_MAB_data(pipeline_path, recomb_freqs)
   
