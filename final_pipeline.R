@@ -735,9 +735,7 @@ get_glm_and_heatmap_MAB <- function(pipeline_path,
   min_z <- min(GLMresults$WALDZ, na.rm = TRUE)
   max_z <- max(GLMresults$WALDZ, na.rm = TRUE)
   mid_z <- (min_z + max_z)/2
-  
-  print(min_z)
-  print(max_z)
+
   
   heatmap <- suppressWarnings(ggplot(GLMresults, aes(x = paste0(ATTRIBUTE, "\n",  attribute_freqs[ATTRIBUTE]), y = MICROBE, fill = WALDZ)) +
                                 geom_tile(color = "black", size=0.4) +
@@ -1049,6 +1047,13 @@ main <- function(pipeline_path, AB_phasepath){
   
   captives_per_supertype <- get_shared_captives(ST_AB_CP, ST_matrix)
   
+  View(captives_per_supertype)
+  
+  View(ST_AB_CP)
+  
+  captives_per_supertype <<- captives_per_supertype
+  
+  ST_AB_CP <<- ST_AB_CP
   
 }
 
