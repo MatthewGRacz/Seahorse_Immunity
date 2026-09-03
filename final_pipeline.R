@@ -933,6 +933,8 @@ main <- function(pipeline_path, AB_phasepath){
                                       0.3,
                                       0.3)
   
+  write.csv(MST_data, paste0(pipeline_path, "MST_GLM.csv"))
+  
   
   JLA_MST_data <- get_glm_and_heatmap_STM(pipeline_path, 
                                           microbe_data, 
@@ -942,6 +944,9 @@ main <- function(pipeline_path, AB_phasepath){
                                           "JLA Microbe–Supertype Associations", 
                                           0.3,
                                           0.3)
+  
+  write.csv(JLA_MST_data, paste0(pipeline_path, "JLA_MST_GLM.csv"))
+  
   
   jumpers <- filter_jumpers(jumpers, 95)
   #filter based on noise, stability, etc
@@ -961,6 +966,8 @@ main <- function(pipeline_path, AB_phasepath){
                                       0.3,
                                       0.3)
   
+  write.csv(MST_data_95, paste0(pipeline_path, "MST_GLM_95.csv"))
+  
   jumpers <- filter_jumpers(jumpers, 90)
   #filter based on noise, stability, etc
   #max_noise set to 90
@@ -978,6 +985,8 @@ main <- function(pipeline_path, AB_phasepath){
                                       "Microbe–Supertype Associations Noise <= 90", 
                                       0.3,
                                       0.3)
+  
+  write.csv(MST_data_90, paste0(pipeline_path, "MST_GLM_90.csv"))
   
   jumpers <- filter_jumpers(jumpers, 85)
   #filter based on noise, stability, etc
@@ -997,6 +1006,8 @@ main <- function(pipeline_path, AB_phasepath){
                                          0.3,
                                          0.3)
   
+  write.csv(MST_data_85, paste0(pipeline_path, "MST_GLM_85.csv"))
+  
   jumpers <- filter_jumpers(jumpers, 80)
   #filter based on noise, stability, etc
   #max_noise set to 80
@@ -1015,7 +1026,7 @@ main <- function(pipeline_path, AB_phasepath){
                                          0.3,
                                          0.3)
   
-  
+  write.csv(MST_data_80, paste0(pipeline_path, "MST_GLM_80.csv"))
   
   MAB_prep_data <- get_MAB_data(pipeline_path, recomb_freqs)
   
@@ -1035,6 +1046,8 @@ main <- function(pipeline_path, AB_phasepath){
                                   0.3,
                                   0.3)
   
+  write.csv(MAB_data, paste0(pipeline_path, "MAB_GLM.csv"))
+  
   JLA_MAB_data <- get_glm_and_heatmap_MAB(pipeline_path, 
                                           microbe_data, 
                                       JLA_microbes, 
@@ -1045,15 +1058,16 @@ main <- function(pipeline_path, AB_phasepath){
                                       0.3,
                                       0.3)
   
+  write.csv(JLA_MAB_data, paste0(pipeline_path, "JLA_MAB_GLM.csv"))
+  
   captives_per_supertype <- get_shared_captives(ST_AB_CP, ST_matrix)
   
   View(captives_per_supertype)
   
   View(ST_AB_CP)
   
-  captives_per_supertype <<- captives_per_supertype
-  
-  ST_AB_CP <<- ST_AB_CP
+  write.csv(ST_AB_CP, paste0(pipeline_path, "ST_AB_CP.csv"))
+  write.csv(captives_per_supertype, paste0(pipeline_path, "captives_per_supertype.csv"))
   
 }
 
